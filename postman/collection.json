@@ -1,0 +1,107 @@
+{
+  "info": {
+    "name": "LBC Telegram Bot - M1",
+    "description": "Postman collection for testing the Telegram webhook endpoint",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Webhook Tests",
+      "item": [
+        {
+          "name": "POST Telegram Webhook - Message",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"update_id\": 123456789,\n  \"message\": {\n    \"message_id\": 1,\n    \"from\": {\n      \"id\": 987654321,\n      \"is_bot\": false,\n      \"first_name\": \"Test\",\n      \"last_name\": \"User\",\n      \"username\": \"testuser\",\n      \"language_code\": \"en\"\n    },\n    \"chat\": {\n      \"id\": 987654321,\n      \"first_name\": \"Test\",\n      \"last_name\": \"User\",\n      \"username\": \"testuser\",\n      \"type\": \"private\"\n    },\n    \"date\": 1634567890,\n    \"text\": \"Hello, bot!\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{WEBHOOK_URL}}/telegram/webhook",
+              "host": ["{{WEBHOOK_URL}}"],
+              "path": ["telegram", "webhook"]
+            },
+            "description": "Test sending a simple message to the webhook"
+          },
+          "response": []
+        },
+        {
+          "name": "POST Telegram Webhook - Callback Query",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"update_id\": 123456790,\n  \"callback_query\": {\n    \"id\": \"callback_123\",\n    \"from\": {\n      \"id\": 987654321,\n      \"is_bot\": false,\n      \"first_name\": \"Test\",\n      \"last_name\": \"User\",\n      \"username\": \"testuser\",\n      \"language_code\": \"en\"\n    },\n    \"message\": {\n      \"message_id\": 2,\n      \"from\": {\n        \"id\": 123456789,\n        \"is_bot\": true,\n        \"first_name\": \"Bot\",\n        \"username\": \"testbot\"\n      },\n      \"chat\": {\n        \"id\": 987654321,\n        \"first_name\": \"Test\",\n        \"last_name\": \"User\",\n        \"username\": \"testuser\",\n        \"type\": \"private\"\n      },\n      \"date\": 1634567890,\n      \"text\": \"Choose an option:\"\n    },\n    \"data\": \"button_clicked\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{WEBHOOK_URL}}/telegram/webhook",
+              "host": ["{{WEBHOOK_URL}}"],
+              "path": ["telegram", "webhook"]
+            },
+            "description": "Test sending a callback query to the webhook"
+          },
+          "response": []
+        },
+        {
+          "name": "GET Webhook (Should Fail)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{WEBHOOK_URL}}/telegram/webhook",
+              "host": ["{{WEBHOOK_URL}}"],
+              "path": ["telegram", "webhook"]
+            },
+            "description": "Test that GET requests are rejected (should return 405)"
+          },
+          "response": []
+        },
+        {
+          "name": "POST Webhook - Invalid Body",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"invalid\": \"data\"\n}"
+            },
+            "url": {
+              "raw": "{{WEBHOOK_URL}}/telegram/webhook",
+              "host": ["{{WEBHOOK_URL}}"],
+              "path": ["telegram", "webhook"]
+            },
+            "description": "Test sending invalid data (should return 400)"
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "WEBHOOK_URL",
+      "value": "https://YOUR-API-ID.execute-api.REGION.amazonaws.com",
+      "type": "string"
+    }
+  ]
+}

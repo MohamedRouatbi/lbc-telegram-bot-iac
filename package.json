@@ -1,0 +1,54 @@
+{
+  "name": "lbc-telegram-bot",
+  "version": "1.0.0",
+  "description": "LBC Telegram Bot - Serverless AWS Stack for Milestone 1",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "lint": "eslint . --ext .ts",
+    "lint:fix": "eslint . --ext .ts --fix",
+    "format": "prettier --write \"src/**/*.ts\" \"infrastructure/**/*.ts\"",
+    "cdk": "cdk",
+    "cdk:deploy": "cdk deploy",
+    "cdk:synth": "cdk synth",
+    "cdk:diff": "cdk diff",
+    "cdk:destroy": "cdk destroy"
+  },
+  "keywords": [
+    "telegram",
+    "aws",
+    "lambda",
+    "serverless",
+    "cdk"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.645.0",
+    "@aws-sdk/client-sqs": "^3.645.0",
+    "@aws-sdk/client-ssm": "^3.645.0",
+    "@aws-sdk/lib-dynamodb": "^3.645.0",
+    "aws-cdk-lib": "^2.152.0",
+    "constructs": "^10.3.0",
+    "uuid": "^10.0.0"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.145",
+    "@types/jest": "^29.5.12",
+    "@types/node": "^20.14.15",
+    "@types/uuid": "^10.0.0",
+    "@typescript-eslint/eslint-plugin": "^7.18.0",
+    "@typescript-eslint/parser": "^7.18.0",
+    "aws-cdk": "^2.152.0",
+    "eslint": "^8.57.0",
+    "jest": "^29.7.0",
+    "prettier": "^3.3.3",
+    "source-map-support": "^0.5.21",
+    "ts-jest": "^29.2.4",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.5.4"
+  }
+}
