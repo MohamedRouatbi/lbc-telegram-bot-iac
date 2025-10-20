@@ -15,6 +15,7 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
     path: event.path,
     headers: event.headers,
   });
+  console.log('Full event:', JSON.stringify(event, null, 2));
 
   try {
     // Only accept POST requests

@@ -11,7 +11,7 @@ const env = {
   region: process.env.AWS_REGION || 'us-east-1',
 };
 
-const stackName = process.env.STACK_NAME || 'lbc-telegram-bot-dev';
+const stackName = process.env.STACK_NAME || 'lbc-telegram-bot-v2';
 const environment = process.env.ENVIRONMENT || 'dev';
 
 new LbcTelegramBotStack(app, stackName, {

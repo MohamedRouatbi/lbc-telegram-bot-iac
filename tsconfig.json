@@ -19,14 +19,6 @@
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": [
-    "src/**/*",
-    "infrastructure/**/*"
-  ],
-  "exclude": [
-    "node_modules",
-    "dist",
-    "cdk.out",
-    "**/*.test.ts"
-  ]
+  "include": ["src/**/*", "infrastructure/**/*"],
+  "exclude": ["node_modules", "dist", "cdk.out", "**/*.test.ts"]
 }

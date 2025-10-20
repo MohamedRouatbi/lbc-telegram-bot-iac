@@ -21,6 +21,7 @@ export class LbcTelegramBotStack extends cdk.Stack {
     super(scope, id, props);
 
     const environment = process.env.ENVIRONMENT || 'dev';
+    const suffix = id.includes('v2') ? '-v2' : ''; // Add suffix for v2
 
     // ============================================
     // KMS Key for SSM Parameters
@@ -28,10 +29,10 @@ export class LbcTelegramBotStack extends cdk.Stack {
     const kmsKey = new kms.Key(this, 'SSMKey', {
       description: 'KMS key for encrypting SSM parameters',
       enableKeyRotation: true,
-      removalPolicy: cdk.RemovalPolicy.RETAIN,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
-    kmsKey.addAlias(`alias/lbc-telegram-bot-${environment}`);
+    kmsKey.addAlias(`alias/lbc-telegram-bot-${environment}${suffix}`);
 
     // ============================================
     // DynamoDB Tables
@@ -39,20 +40,20 @@ export class LbcTelegramBotStack extends cdk.Stack {
 
     // Users Table
     const usersTable = new dynamodb.Table(this, 'UsersTable', {
-      tableName: `lbc-users-${environment}`,
+      tableName: `lbc-users-${environment}${suffix}`,
       partitionKey: { name: 'userId', type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
-      removalPolicy: cdk.RemovalPolicy.RETAIN,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
       pointInTimeRecovery: true,
       encryption: dynamodb.TableEncryption.AWS_MANAGED,
     });
 
     // Sessions Table with GSI
     const sessionsTable = new dynamodb.Table(this, 'SessionsTable', {
-      tableName: `lbc-sessions-${environment}`,
+      tableName: `lbc-sessions-${environment}${suffix}`,
       partitionKey: { name: 'sessionId', type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
-      removalPolicy: cdk.RemovalPolicy.RETAIN,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
       pointInTimeRecovery: true,
       encryption: dynamodb.TableEncryption.AWS_MANAGED,
       timeToLiveAttribute: 'expiresAt',
@@ -66,10 +67,10 @@ export class LbcTelegramBotStack extends cdk.Stack {
 
     // Events Table with GSI
     const eventsTable = new dynamodb.Table(this, 'EventsTable', {
-      tableName: `lbc-events-${environment}`,
+      tableName: `lbc-events-${environment}${suffix}`,
       partitionKey: { name: 'eventId', type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
-      removalPolicy: cdk.RemovalPolicy.RETAIN,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
       pointInTimeRecovery: true,
       encryption: dynamodb.TableEncryption.AWS_MANAGED,
     });
@@ -87,14 +88,14 @@ export class LbcTelegramBotStack extends cdk.Stack {
 
     // Dead Letter Queue
     const dlq = new sqs.Queue(this, 'TelegramEventsDLQ', {
-      queueName: `lbc-telegram-events-dlq-${environment}`,
+      queueName: `lbc-telegram-events-dlq-${environment}${suffix}`,
       retentionPeriod: cdk.Duration.days(14),
       encryption: sqs.QueueEncryption.KMS_MANAGED,
     });
 
     // Main Queue
     const telegramEventsQueue = new sqs.Queue(this, 'TelegramEventsQueue', {
-      queueName: `lbc-telegram-events-${environment}`,
+      queueName: `lbc-telegram-events-${environment}${suffix}`,
       visibilityTimeout: cdk.Duration.seconds(300),
       retentionPeriod: cdk.Duration.days(4),
       encryption: sqs.QueueEncryption.KMS_MANAGED,
@@ -110,14 +111,14 @@ export class LbcTelegramBotStack extends cdk.Stack {
 
     // Note: These will need to be populated manually after deployment
     new ssm.StringParameter(this, 'TelegramBotTokenParam', {
-      parameterName: `/lbc-telegram-bot/${environment}/telegram-bot-token`,
+      parameterName: `/lbc-telegram-bot/${environment}${suffix}/telegram-bot-token`,
       stringValue: 'PLACEHOLDER - Set this after deployment',
       description: 'Telegram Bot Token',
       tier: ssm.ParameterTier.STANDARD,
     });
 
     new ssm.StringParameter(this, 'TelegramWebhookSecretParam', {
-      parameterName: `/lbc-telegram-bot/${environment}/telegram-webhook-secret`,
+      parameterName: `/lbc-telegram-bot/${environment}${suffix}/telegram-webhook-secret`,
       stringValue: 'PLACEHOLDER - Set this after deployment',
       description: 'Telegram Webhook Secret',
       tier: ssm.ParameterTier.STANDARD,
@@ -127,13 +128,27 @@ export class LbcTelegramBotStack extends cdk.Stack {
     // Lambda Functions
     // ============================================
 
+    // Create log groups explicitly to avoid LogRetention custom resource issues
+    // The underscore prefix indicates these are intentionally unused (just created for side effects)
+    new logs.LogGroup(this, 'WebhookLogGroup', {
+      logGroupName: `/aws/lambda/telegramWebhook-${environment}${suffix}`,
+      retention: logs.RetentionDays.TWO_WEEKS,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
+    new logs.LogGroup(this, 'JobWorkerLogGroup', {
+      logGroupName: `/aws/lambda/jobWorker-${environment}${suffix}`,
+      retention: logs.RetentionDays.TWO_WEEKS,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
     // Webhook Lambda
     const telegramWebhookLambda = new lambda.Function(this, 'TelegramWebhookLambda', {
-      functionName: `telegramWebhook-${environment}`,
+      functionName: `telegramWebhook-${environment}${suffix}`,
       runtime: lambda.Runtime.NODEJS_20_X,
-      handler: 'src/lambdas/telegramWebhook/index.handler',
+      handler: 'dist/src/lambdas/telegramWebhook/index.handler',
       code: lambda.Code.fromAsset(path.join(__dirname, '../..'), {
-        exclude: ['node_modules', 'cdk.out', 'tests', '.git'],
+        exclude: ['node_modules', 'cdk.out', 'tests', '.git', '*.md', 'docs', 'postman', '.env', 'src'],
       }),
       environment: {
         SQS_QUEUE_URL: telegramEventsQueue.queueUrl,
@@ -141,7 +156,6 @@ export class LbcTelegramBotStack extends cdk.Stack {
       },
       timeout: cdk.Duration.seconds(30),
       memorySize: 256,
-      logRetention: logs.RetentionDays.TWO_WEEKS,
     });
 
     // Grant permissions
@@ -149,11 +163,11 @@ export class LbcTelegramBotStack extends cdk.Stack {
 
     // Job Worker Lambda
     const jobWorkerLambda = new lambda.Function(this, 'JobWorkerLambda', {
-      functionName: `jobWorker-${environment}`,
+      functionName: `jobWorker-${environment}${suffix}`,
       runtime: lambda.Runtime.NODEJS_20_X,
-      handler: 'src/lambdas/jobWorker/index.handler',
+      handler: 'dist/src/lambdas/jobWorker/index.handler',
       code: lambda.Code.fromAsset(path.join(__dirname, '../..'), {
-        exclude: ['node_modules', 'cdk.out', 'tests', '.git'],
+        exclude: ['node_modules', 'cdk.out', 'tests', '.git', '*.md', 'docs', 'postman', '.env', 'src'],
       }),
       environment: {
         USERS_TABLE_NAME: usersTable.tableName,
@@ -163,7 +177,6 @@ export class LbcTelegramBotStack extends cdk.Stack {
       },
       timeout: cdk.Duration.seconds(60),
       memorySize: 512,
-      logRetention: logs.RetentionDays.TWO_WEEKS,
     });
 
     // Grant DynamoDB permissions
@@ -176,7 +189,7 @@ export class LbcTelegramBotStack extends cdk.Stack {
       new iam.PolicyStatement({
         actions: ['ssm:GetParameter', 'ssm:GetParameters'],
         resources: [
-          `arn:aws:ssm:${this.region}:${this.account}:parameter/lbc-telegram-bot/${environment}/*`,
+          `arn:aws:ssm:${this.region}:${this.account}:parameter/lbc-telegram-bot/${environment}${suffix}/*`,
         ],
       })
     );
@@ -197,7 +210,7 @@ export class LbcTelegramBotStack extends cdk.Stack {
     // ============================================
 
     const httpApi = new apigatewayv2.HttpApi(this, 'TelegramWebhookApi', {
-      apiName: `lbc-telegram-webhook-${environment}`,
+      apiName: `lbc-telegram-webhook-${environment}${suffix}`,
       description: 'HTTP API for Telegram webhook',
       corsPreflight: {
         allowOrigins: ['*'],
@@ -222,7 +235,7 @@ export class LbcTelegramBotStack extends cdk.Stack {
     // SNS Topic for Alarms
     const alarmTopic = new sns.Topic(this, 'AlarmTopic', {
       displayName: 'LBC Telegram Bot Alarms',
-      topicName: `lbc-telegram-bot-alarms-${environment}`,
+      topicName: `lbc-telegram-bot-alarms-${environment}${suffix}`,
     });
 
     // Add email subscription (update with actual email)
