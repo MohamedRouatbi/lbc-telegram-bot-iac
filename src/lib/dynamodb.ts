@@ -9,7 +9,7 @@ import {
 } from '@aws-sdk/lib-dynamodb';
 import type { UserRecord, SessionRecord, EventRecord } from './types';
 
-const client = new DynamoDBClient({ region: process.env.AWS_REGION || 'us-east-1' });
+const client = new DynamoDBClient({ region: process.env.AWS_REGION });
 const docClient = DynamoDBDocumentClient.from(client);
 
 const USERS_TABLE = process.env.USERS_TABLE_NAME || 'lbc-users';

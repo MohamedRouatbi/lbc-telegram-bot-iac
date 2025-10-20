@@ -114,7 +114,6 @@ export class LbcTelegramBotStack extends cdk.Stack {
       stringValue: 'PLACEHOLDER - Set this after deployment',
       description: 'Telegram Bot Token',
       tier: ssm.ParameterTier.STANDARD,
-      type: ssm.ParameterType.SECURE_STRING,
     });
 
     new ssm.StringParameter(this, 'TelegramWebhookSecretParam', {
@@ -122,7 +121,6 @@ export class LbcTelegramBotStack extends cdk.Stack {
       stringValue: 'PLACEHOLDER - Set this after deployment',
       description: 'Telegram Webhook Secret',
       tier: ssm.ParameterTier.STANDARD,
-      type: ssm.ParameterType.SECURE_STRING,
     });
 
     // ============================================
@@ -139,7 +137,6 @@ export class LbcTelegramBotStack extends cdk.Stack {
       }),
       environment: {
         SQS_QUEUE_URL: telegramEventsQueue.queueUrl,
-        AWS_REGION: this.region,
         ENVIRONMENT: environment,
       },
       timeout: cdk.Duration.seconds(30),
@@ -162,13 +159,11 @@ export class LbcTelegramBotStack extends cdk.Stack {
         USERS_TABLE_NAME: usersTable.tableName,
         SESSIONS_TABLE_NAME: sessionsTable.tableName,
         EVENTS_TABLE_NAME: eventsTable.tableName,
-        AWS_REGION: this.region,
         ENVIRONMENT: environment,
       },
       timeout: cdk.Duration.seconds(60),
       memorySize: 512,
       logRetention: logs.RetentionDays.TWO_WEEKS,
-      reservedConcurrentExecutions: 10, // Limit concurrency to control costs
     });
 
     // Grant DynamoDB permissions

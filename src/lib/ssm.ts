@@ -1,6 +1,6 @@
 import { SSMClient, GetParameterCommand } from '@aws-sdk/client-ssm';
 
-const ssmClient = new SSMClient({ region: process.env.AWS_REGION || 'us-east-1' });
+const ssmClient = new SSMClient({ region: process.env.AWS_REGION });
 
 // Cache for parameters to avoid repeated SSM calls
 const parameterCache = new Map<string, { value: string; expiresAt: number }>();

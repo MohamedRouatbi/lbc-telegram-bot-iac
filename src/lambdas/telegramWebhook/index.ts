@@ -2,7 +2,7 @@ import type { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { SQSClient, SendMessageCommand } from '@aws-sdk/client-sqs';
 import type { TelegramUpdate, TelegramEventMessage } from '../../lib/types';
 
-const sqsClient = new SQSClient({ region: process.env.AWS_REGION || 'us-east-1' });
+const sqsClient = new SQSClient({ region: process.env.AWS_REGION });
 const QUEUE_URL = process.env.SQS_QUEUE_URL || '';
 
 /**
