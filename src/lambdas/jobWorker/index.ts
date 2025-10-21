@@ -148,8 +148,8 @@ async function recordEvent(message: TelegramEventMessage): Promise<void> {
     userId: message.update.message?.from
       ? `telegram_${message.update.message.from.id}`
       : message.update.callback_query?.from
-      ? `telegram_${message.update.callback_query.from.id}`
-      : 'unknown',
+        ? `telegram_${message.update.callback_query.from.id}`
+        : 'unknown',
     eventType: message.eventType,
     payload: message.update,
     timestamp: message.receivedAt,

@@ -1,6 +1,21 @@
-import type { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
+import type { APIGatewayProxyResult } from 'aws-lambda';
 import { SQSClient, SendMessageCommand } from '@aws-sdk/client-sqs';
 import type { TelegramUpdate, TelegramEventMessage } from '../../lib/types';
+
+// Support both API Gateway v1 and v2 event formats
+interface APIGatewayEvent {
+  httpMethod?: string;
+  path?: string;
+  rawPath?: string;
+  body?: string;
+  headers: Record<string, string>;
+  requestContext?: {
+    http?: {
+      method: string;
+      path: string;
+    };
+  };
+}
 
 const sqsClient = new SQSClient({ region: process.env.AWS_REGION });
 const QUEUE_URL = process.env.SQS_QUEUE_URL || '';
@@ -9,17 +24,20 @@ const QUEUE_URL = process.env.SQS_QUEUE_URL || '';
  * Lambda handler for Telegram webhook
  * Receives webhook POST requests, validates them, and enqueues to SQS
  */
-export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> {
+export async function handler(event: APIGatewayEvent): Promise<APIGatewayProxyResult> {
+  // Support both API Gateway v1 and v2 formats
+  const httpMethod = event.httpMethod || event.requestContext?.http?.method;
+  const path = event.path || event.requestContext?.http?.path || event.rawPath;
+  
   console.log('Received webhook request', {
-    method: event.httpMethod,
-    path: event.path,
+    method: httpMethod,
+    path: path,
     headers: event.headers,
   });
-  console.log('Full event:', JSON.stringify(event, null, 2));
 
   try {
     // Only accept POST requests
-    if (event.httpMethod !== 'POST') {
+    if (httpMethod !== 'POST') {
       return {
         statusCode: 405,
         body: JSON.stringify({ error: 'Method Not Allowed' }),

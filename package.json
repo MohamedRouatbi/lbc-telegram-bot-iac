@@ -6,8 +6,10 @@
   "scripts": {
     "build": "tsc",
     "watch": "tsc -w",
-    "test": "jest",
-    "test:watch": "jest --watch",
+    "test": "jest --testPathIgnorePatterns=/acceptance/",
+    "test:watch": "jest --watch --testPathIgnorePatterns=/acceptance/",
+    "test:coverage": "jest --coverage --testPathIgnorePatterns=/acceptance/",
+    "test:e2e": "jest --testPathPattern=acceptance",
     "lint": "eslint . --ext .ts",
     "lint:fix": "eslint . --ext .ts --fix",
     "format": "prettier --write \"src/**/*.ts\" \"infrastructure/**/*.ts\"",
@@ -36,6 +38,7 @@
     "uuid": "^10.0.0"
   },
   "devDependencies": {
+    "@aws-sdk/util-dynamodb": "^3.913.0",
     "@types/aws-lambda": "^8.10.145",
     "@types/jest": "^29.5.12",
     "@types/node": "^20.14.15",
@@ -43,6 +46,7 @@
     "@typescript-eslint/eslint-plugin": "^7.18.0",
     "@typescript-eslint/parser": "^7.18.0",
     "aws-cdk": "^2.152.0",
+    "axios": "^1.12.2",
     "eslint": "^8.57.0",
     "jest": "^29.7.0",
     "prettier": "^3.3.3",

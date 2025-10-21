@@ -60,9 +60,7 @@ export async function getParameter(
  * @param parameterNames - Array of parameter names to retrieve
  * @returns Object with parameter names as keys and values
  */
-export async function getParameters(
-  parameterNames: string[]
-): Promise<Record<string, string>> {
+export async function getParameters(parameterNames: string[]): Promise<Record<string, string>> {
   const results: Record<string, string> = {};
 
   await Promise.all(

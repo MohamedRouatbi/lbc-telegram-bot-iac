@@ -14,11 +14,14 @@ This document details all IAM roles and policies created by the CDK stack for Mi
 ## 1. TelegramWebhookLambdaRole
 
 ### Purpose
+
 Allows the webhook Lambda to:
+
 - Send messages to SQS queue
 - Write logs to CloudWatch
 
 ### Trust Policy
+
 ```json
 {
   "Version": "2012-10-17",
@@ -35,22 +38,20 @@ Allows the webhook Lambda to:
 ```
 
 ### Managed Policies Attached
+
 - `arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole`
 
 ### Inline Policies
 
 #### SQS Send Messages Policy
+
 ```json
 {
   "Version": "2012-10-17",
   "Statement": [
     {
       "Effect": "Allow",
-      "Action": [
-        "sqs:SendMessage",
-        "sqs:GetQueueAttributes",
-        "sqs:GetQueueUrl"
-      ],
+      "Action": ["sqs:SendMessage", "sqs:GetQueueAttributes", "sqs:GetQueueUrl"],
       "Resource": "arn:aws:sqs:REGION:ACCOUNT_ID:lbc-telegram-events-dev"
     }
   ]
@@ -58,17 +59,14 @@ Allows the webhook Lambda to:
 ```
 
 #### CloudWatch Logs Policy (from AWSLambdaBasicExecutionRole)
+
 ```json
 {
   "Version": "2012-10-17",
   "Statement": [
     {
       "Effect": "Allow",
-      "Action": [
-        "logs:CreateLogGroup",
-        "logs:CreateLogStream",
-        "logs:PutLogEvents"
-      ],
+      "Action": ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"],
       "Resource": "arn:aws:logs:REGION:ACCOUNT_ID:log-group:/aws/lambda/telegramWebhook-dev:*"
     }
   ]
@@ -80,7 +78,9 @@ Allows the webhook Lambda to:
 ## 2. JobWorkerLambdaRole
 
 ### Purpose
+
 Allows the job worker Lambda to:
+
 - Receive and delete messages from SQS queue
 - Read/write data to DynamoDB tables
 - Read encrypted parameters from SSM Parameter Store
@@ -88,6 +88,7 @@ Allows the job worker Lambda to:
 - Write logs to CloudWatch
 
 ### Trust Policy
+
 ```json
 {
   "Version": "2012-10-17",
@@ -104,11 +105,13 @@ Allows the job worker Lambda to:
 ```
 
 ### Managed Policies Attached
+
 - `arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole`
 
 ### Inline Policies
 
 #### SQS Consumer Policy
+
 ```json
 {
   "Version": "2012-10-17",
@@ -128,6 +131,7 @@ Allows the job worker Lambda to:
 ```
 
 #### DynamoDB Access Policy
+
 ```json
 {
   "Version": "2012-10-17",
@@ -158,16 +162,14 @@ Allows the job worker Lambda to:
 ```
 
 #### SSM Parameter Store Policy
+
 ```json
 {
   "Version": "2012-10-17",
   "Statement": [
     {
       "Effect": "Allow",
-      "Action": [
-        "ssm:GetParameter",
-        "ssm:GetParameters"
-      ],
+      "Action": ["ssm:GetParameter", "ssm:GetParameters"],
       "Resource": "arn:aws:ssm:REGION:ACCOUNT_ID:parameter/lbc-telegram-bot/dev/*"
     }
   ]
@@ -175,6 +177,7 @@ Allows the job worker Lambda to:
 ```
 
 #### KMS Decrypt Policy
+
 ```json
 {
   "Version": "2012-10-17",
@@ -193,24 +196,29 @@ Allows the job worker Lambda to:
 ## Security Best Practices Applied
 
 ### ✅ Least Privilege Principle
+
 - Each Lambda only has permissions for resources it needs
-- No wildcard (*) permissions on resources
+- No wildcard (\*) permissions on resources
 - Specific actions only (no broad permissions like `dynamodb:*`)
 
 ### ✅ Resource-Level Permissions
+
 - Policies specify exact ARNs of resources
 - No account-wide permissions
 
 ### ✅ Service-Scoped Roles
+
 - Roles can only be assumed by AWS Lambda service
 - Not assumable by users or other services
 
 ### ✅ Encryption at Rest
+
 - KMS key used for SSM parameter encryption
 - DynamoDB uses AWS-managed encryption
 - SQS uses KMS-managed encryption
 
 ### ✅ Encryption in Transit
+
 - All AWS SDK calls use HTTPS
 - API Gateway enforces HTTPS
 
@@ -219,12 +227,14 @@ Allows the job worker Lambda to:
 ## How to View Actual Policies in AWS Console
 
 ### Via AWS Console:
+
 1. Go to **IAM** → **Roles**
 2. Search for `telegramWebhook-dev` or `jobWorker-dev`
 3. Click on the role
 4. View **Permissions** tab
 
 ### Via AWS CLI:
+
 ```powershell
 # List Lambda roles
 aws iam list-roles --query "Roles[?contains(RoleName, 'telegram')].RoleName"
@@ -245,19 +255,25 @@ aws iam get-role-policy --role-name <ROLE_NAME> --policy-name <POLICY_NAME>
 ## Audit and Compliance
 
 ### CloudTrail Logging
+
 All IAM actions are logged in CloudTrail:
+
 - Role assumptions
 - Permission grants
 - Policy changes
 
 ### Regular Review
+
 Recommended: Review IAM policies quarterly to ensure:
+
 1. No unused permissions
 2. No overly broad permissions
 3. Compliance with security standards
 
 ### Access Analyzer
+
 Enable AWS IAM Access Analyzer to:
+
 - Detect overly permissive policies
 - Identify external access
 - Generate least-privilege policies

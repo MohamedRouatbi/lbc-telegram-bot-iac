@@ -1,11 +1,11 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { handler } from '../../src/lambdas/telegramWebhook/index';
-import type { APIGatewayProxyEvent } from 'aws-lambda';
 
 // Mock AWS SDK
 jest.mock('@aws-sdk/client-sqs');
 
 describe('telegramWebhook Lambda', () => {
-  const mockEvent = (overrides: Partial<APIGatewayProxyEvent> = {}): APIGatewayProxyEvent => ({
+  const mockEvent = (overrides: any = {}): any => ({
     httpMethod: 'POST',
     path: '/telegram/webhook',
     headers: {},

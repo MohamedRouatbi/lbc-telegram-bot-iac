@@ -100,7 +100,7 @@
   "variable": [
     {
       "key": "WEBHOOK_URL",
-      "value": "https://YOUR-API-ID.execute-api.REGION.amazonaws.com",
+      "value": "https://1mi1qv7d67.execute-api.us-east-1.amazonaws.com",
       "type": "string"
     }
   ]

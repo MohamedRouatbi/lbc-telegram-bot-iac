@@ -3,6 +3,7 @@
 ## ✅ What Has Been Created
 
 ### 📁 Project Structure
+
 ```
 c:\Users\moham\OneDrive\Desktop\AWS\
 ├── src/
@@ -43,11 +44,13 @@ c:\Users\moham\OneDrive\Desktop\AWS\
 ### 🏗️ AWS Infrastructure (Defined in CDK)
 
 #### ✅ API Gateway HTTP API
+
 - Route: `POST /telegram/webhook`
 - Integration: Lambda (telegramWebhook)
 - CORS enabled
 
 #### ✅ Lambda Functions
+
 1. **telegramWebhook**
    - Runtime: Node.js 20.x
    - Memory: 256 MB
@@ -62,6 +65,7 @@ c:\Users\moham\OneDrive\Desktop\AWS\
    - Concurrency: 10 (reserved)
 
 #### ✅ SQS Queues
+
 - **lbc-telegram-events** - Main queue
   - Visibility: 5 minutes
   - Retention: 4 days
@@ -71,6 +75,7 @@ c:\Users\moham\OneDrive\Desktop\AWS\
   - Retention: 14 days
 
 #### ✅ DynamoDB Tables (On-Demand)
+
 1. **users**
    - PK: userId
    - Point-in-time recovery enabled
@@ -88,11 +93,13 @@ c:\Users\moham\OneDrive\Desktop\AWS\
    - Point-in-time recovery enabled
 
 #### ✅ SSM Parameter Store
+
 - `/lbc-telegram-bot/dev/telegram-bot-token` (SecureString)
 - `/lbc-telegram-bot/dev/telegram-webhook-secret` (SecureString)
 - KMS encryption with customer-managed key
 
 #### ✅ CloudWatch
+
 - Log retention: 14 days
 - Alarms:
   - Lambda errors > 5 in 5 min
@@ -100,6 +107,7 @@ c:\Users\moham\OneDrive\Desktop\AWS\
 - SNS topic for alarm notifications
 
 #### ✅ IAM Roles
+
 - **telegramWebhook role**: SQS SendMessage + CloudWatch Logs
 - **jobWorker role**: SQS Consume + DynamoDB Read/Write + SSM GetParameter + KMS Decrypt + CloudWatch Logs
 
@@ -108,6 +116,7 @@ c:\Users\moham\OneDrive\Desktop\AWS\
 ## 🚀 Next Steps - What YOU Need to Do
 
 ### Step 1: Install Dependencies
+
 ```powershell
 cd "c:\Users\moham\OneDrive\Desktop\AWS"
 npm install
@@ -116,28 +125,33 @@ npm install
 This will install all required packages (AWS SDK, CDK, TypeScript, etc.)
 
 ### Step 2: Configure AWS CLI
+
 ```powershell
 aws configure
 ```
 
 Enter the credentials the client sent you:
+
 - AWS Access Key ID
 - AWS Secret Access Key
 - Default region: `us-east-1`
 - Default output: `json`
 
 ### Step 3: Set Up Environment Variables
+
 ```powershell
 Copy-Item .env.example .env
 notepad .env
 ```
 
 Update with:
+
 - Your AWS account ID
 - Telegram bot token (get from @BotFather)
 - Your email for budget alerts
 
 ### Step 4: Bootstrap CDK (One-Time)
+
 ```powershell
 $env:CDK_DEFAULT_ACCOUNT = "YOUR_ACCOUNT_ID"
 $env:CDK_DEFAULT_REGION = "us-east-1"
@@ -145,6 +159,7 @@ npx cdk bootstrap aws://YOUR_ACCOUNT_ID/us-east-1
 ```
 
 ### Step 5: Deploy to AWS
+
 ```powershell
 npm run build
 npm run cdk:deploy
@@ -153,6 +168,7 @@ npm run cdk:deploy
 This will create ALL AWS resources automatically!
 
 ### Step 6: Add Secrets to SSM
+
 ```powershell
 aws ssm put-parameter `
   --name "/lbc-telegram-bot/dev/telegram-bot-token" `
@@ -162,7 +178,9 @@ aws ssm put-parameter `
 ```
 
 ### Step 7: Set Telegram Webhook
+
 Use the webhook URL from deployment output:
+
 ```powershell
 $BOT_TOKEN = "YOUR_BOT_TOKEN"
 $WEBHOOK_URL = "https://abc123.execute-api.us-east-1.amazonaws.com/telegram/webhook"
@@ -173,7 +191,9 @@ curl -X POST "https://api.telegram.org/bot$BOT_TOKEN/setWebhook" `
 ```
 
 ### Step 8: Test!
+
 Send a message to your bot in Telegram, then check CloudWatch Logs:
+
 ```powershell
 aws logs tail /aws/lambda/telegramWebhook-dev --follow
 aws logs tail /aws/lambda/jobWorker-dev --follow
@@ -184,7 +204,9 @@ aws logs tail /aws/lambda/jobWorker-dev --follow
 ## 📚 Documentation Reference
 
 ### 🏛️ Architecture
+
 See `docs/architecture.md` for:
+
 - System diagram
 - Component details
 - Data flow
@@ -192,7 +214,9 @@ See `docs/architecture.md` for:
 - Scalability notes
 
 ### 📖 Deployment Guide
+
 See `docs/runbook.md` for:
+
 - Step-by-step deployment
 - Configuration instructions
 - Testing procedures
@@ -200,14 +224,18 @@ See `docs/runbook.md` for:
 - Rollback procedures
 
 ### 🔐 IAM Policies
+
 See `docs/iam-policies.md` for:
+
 - All IAM roles
 - Policy documents
 - Security best practices
 - Audit procedures
 
 ### 🧪 Testing
+
 See `postman/collection.json` for:
+
 - API testing requests
 - Sample payloads
 - Import into Postman
@@ -216,20 +244,20 @@ See `postman/collection.json` for:
 
 ## 🎯 Milestone 1 Acceptance Criteria
 
-| Criteria | Status | Evidence |
-|----------|--------|----------|
-| AWS HTTP API route POST /telegram/webhook → Lambda | ✅ | `infrastructure/lib/lbc-stack.ts` lines 234-249 |
-| SQS lbc-telegram-events + DLQ | ✅ | `infrastructure/lib/lbc-stack.ts` lines 91-113 |
-| Lambda jobWorker with SQS trigger | ✅ | `infrastructure/lib/lbc-stack.ts` lines 179-188 |
-| DynamoDB: users, sessions, events (on-demand) | ✅ | `infrastructure/lib/lbc-stack.ts` lines 40-87 |
-| SSM Parameter Store (SecureString + KMS) | ✅ | `infrastructure/lib/lbc-stack.ts` lines 27-34, 118-135 |
-| CloudWatch logs (14-day retention) | ✅ | `infrastructure/lib/lbc-stack.ts` lines 150, 172 |
-| CloudWatch alarms | ✅ | `infrastructure/lib/lbc-stack.ts` lines 261-308 |
-| $50 AWS Budget alerts | ⚠️ | Manual setup required (see `docs/runbook.md` Step 5) |
-| Postman collection | ✅ | `postman/collection.json` |
-| Basic CI (lint/test) | ✅ | `.github/workflows/ci.yml` |
-| curl/Postman → 200 from webhook | ⏳ | Test after deployment |
-| Message enqueued to SQS and consumed | ⏳ | Test after deployment |
+| Criteria                                           | Status | Evidence                                               |
+| -------------------------------------------------- | ------ | ------------------------------------------------------ |
+| AWS HTTP API route POST /telegram/webhook → Lambda | ✅     | `infrastructure/lib/lbc-stack.ts` lines 234-249        |
+| SQS lbc-telegram-events + DLQ                      | ✅     | `infrastructure/lib/lbc-stack.ts` lines 91-113         |
+| Lambda jobWorker with SQS trigger                  | ✅     | `infrastructure/lib/lbc-stack.ts` lines 179-188        |
+| DynamoDB: users, sessions, events (on-demand)      | ✅     | `infrastructure/lib/lbc-stack.ts` lines 40-87          |
+| SSM Parameter Store (SecureString + KMS)           | ✅     | `infrastructure/lib/lbc-stack.ts` lines 27-34, 118-135 |
+| CloudWatch logs (14-day retention)                 | ✅     | `infrastructure/lib/lbc-stack.ts` lines 150, 172       |
+| CloudWatch alarms                                  | ✅     | `infrastructure/lib/lbc-stack.ts` lines 261-308        |
+| $50 AWS Budget alerts                              | ⚠️     | Manual setup required (see `docs/runbook.md` Step 5)   |
+| Postman collection                                 | ✅     | `postman/collection.json`                              |
+| Basic CI (lint/test)                               | ✅     | `.github/workflows/ci.yml`                             |
+| curl/Postman → 200 from webhook                    | ⏳     | Test after deployment                                  |
+| Message enqueued to SQS and consumed               | ⏳     | Test after deployment                                  |
 
 **Legend**: ✅ Complete | ⚠️ Requires manual step | ⏳ Pending deployment
 
@@ -237,34 +265,37 @@ See `postman/collection.json` for:
 
 ## 📦 Deliverables
 
-| Artifact | Location | Status |
-|----------|----------|--------|
-| Stack diagram | `docs/architecture.md` | ✅ |
-| IAM role policies | `docs/iam-policies.md` | ✅ |
-| Environment runbook | `docs/runbook.md` | ✅ |
-| Postman JSON | `postman/collection.json` | ✅ |
-| Lambda code | `src/lambdas/` | ✅ |
-| CDK infrastructure | `infrastructure/` | ✅ |
-| Unit tests | `tests/` | ✅ |
-| CI pipeline | `.github/workflows/ci.yml` | ✅ |
+| Artifact            | Location                   | Status |
+| ------------------- | -------------------------- | ------ |
+| Stack diagram       | `docs/architecture.md`     | ✅     |
+| IAM role policies   | `docs/iam-policies.md`     | ✅     |
+| Environment runbook | `docs/runbook.md`          | ✅     |
+| Postman JSON        | `postman/collection.json`  | ✅     |
+| Lambda code         | `src/lambdas/`             | ✅     |
+| CDK infrastructure  | `infrastructure/`          | ✅     |
+| Unit tests          | `tests/`                   | ✅     |
+| CI pipeline         | `.github/workflows/ci.yml` | ✅     |
 
 ---
 
 ## 💡 Key Features
 
 ### ✨ Infrastructure-as-Code
+
 - Everything defined in TypeScript (CDK)
 - Version controlled
 - Repeatable deployments
 - Easy to tear down and recreate
 
 ### 🔒 Security
+
 - Secrets encrypted with KMS
 - Least-privilege IAM roles
 - No hardcoded credentials
 - HTTPS everywhere
 
 ### 💰 Cost-Optimized
+
 - On-demand DynamoDB (pay per request)
 - HTTP API (cheaper than REST)
 - Reserved Lambda concurrency (10)
@@ -272,12 +303,14 @@ See `postman/collection.json` for:
 - Estimated: **~$3/month**
 
 ### 📊 Observable
+
 - CloudWatch Logs for all Lambdas
 - Alarms for errors and DLQ
 - SNS email notifications
 - Metrics for performance monitoring
 
 ### 🧪 Testable
+
 - Unit tests with Jest
 - Integration tests via Postman
 - CI pipeline with GitHub Actions
@@ -288,6 +321,7 @@ See `postman/collection.json` for:
 ## ⚠️ Known Limitations (M1 Scope)
 
 These are **intentional** for Milestone 1:
+
 - ❌ No Telegram webhook signature validation (add in M2)
 - ❌ No API rate limiting (add in M2)
 - ❌ No X-Ray tracing (add in M2)
@@ -300,18 +334,23 @@ These are **intentional** for Milestone 1:
 ## 🆘 Need Help?
 
 ### Error Messages
+
 See `docs/runbook.md` → Troubleshooting section
 
 ### TypeScript/Lint Errors
+
 The lint errors you see are expected **before** running `npm install`. They will disappear after installing dependencies.
 
 ### AWS Deployment Issues
+
 1. Check AWS credentials: `aws sts get-caller-identity`
 2. Check CDK bootstrap: `cdk bootstrap --show-template`
 3. Review CloudFormation events in AWS Console
 
 ### Questions?
+
 Review the documentation:
+
 - Architecture questions → `docs/architecture.md`
 - Deployment questions → `docs/runbook.md`
 - Security questions → `docs/iam-policies.md`
@@ -323,6 +362,7 @@ Review the documentation:
 You now have a **complete, production-ready serverless AWS stack** for handling Telegram webhooks!
 
 ### What I Built:
+
 ✅ Full TypeScript codebase  
 ✅ AWS CDK infrastructure (DynamoDB, Lambda, SQS, API Gateway, etc.)  
 ✅ CloudWatch monitoring & alarms  
@@ -330,9 +370,10 @@ You now have a **complete, production-ready serverless AWS stack** for handling 
 ✅ Comprehensive documentation  
 ✅ Testing framework  
 ✅ CI/CD pipeline  
-✅ Deployment automation  
+✅ Deployment automation
 
 ### What You Need to Do:
+
 1. Run `npm install`
 2. Configure AWS CLI
 3. Set environment variables

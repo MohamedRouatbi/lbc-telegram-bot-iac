@@ -70,12 +70,14 @@
 ## Component Details
 
 ### API Gateway HTTP API
+
 - **Type**: HTTP API (cheaper than REST API)
 - **Endpoint**: `POST /telegram/webhook`
 - **CORS**: Enabled for POST
 - **Cost**: ~$1/million requests
 
 ### Lambda: telegramWebhook
+
 - **Runtime**: Node.js 20.x
 - **Memory**: 256 MB
 - **Timeout**: 30 seconds
@@ -88,6 +90,7 @@
   5. Return 200 OK to Telegram
 
 ### SQS Queue: lbc-telegram-events
+
 - **Type**: Standard queue
 - **Visibility Timeout**: 5 minutes (matches Lambda timeout + buffer)
 - **Message Retention**: 4 days
@@ -96,6 +99,7 @@
 - **Purpose**: Decouples webhook receipt from processing
 
 ### Lambda: jobWorker
+
 - **Runtime**: Node.js 20.x
 - **Memory**: 512 MB
 - **Timeout**: 60 seconds
@@ -110,6 +114,7 @@
 ### DynamoDB Tables
 
 #### users
+
 ```
 PK: userId (String) - format: telegram_{telegramId}
 Attributes:
@@ -123,6 +128,7 @@ Attributes:
 ```
 
 #### sessions
+
 ```
 PK: sessionId (String) - UUID
 GSI: UserIdIndex (userId)
@@ -137,6 +143,7 @@ Attributes:
 ```
 
 #### events
+
 ```
 PK: eventId (String) - UUID
 GSI: UserIdIndex (userId + timestamp)
@@ -149,6 +156,7 @@ Attributes:
 ```
 
 ### SSM Parameter Store
+
 - **Parameters**:
   - `/lbc-telegram-bot/{env}/telegram-bot-token` (SecureString)
   - `/lbc-telegram-bot/{env}/telegram-webhook-secret` (SecureString)
@@ -156,6 +164,7 @@ Attributes:
 - **Rotation**: Manual (for M1)
 
 ### CloudWatch
+
 - **Log Groups**:
   - `/aws/lambda/telegramWebhook-{env}` (14-day retention)
   - `/aws/lambda/jobWorker-{env}` (14-day retention)
@@ -169,6 +178,7 @@ Attributes:
 ### IAM Roles
 
 #### telegramWebhook Lambda Role
+
 ```json
 {
   "Permissions": [
@@ -181,6 +191,7 @@ Attributes:
 ```
 
 #### jobWorker Lambda Role
+
 ```json
 {
   "Permissions": [
@@ -201,6 +212,7 @@ Attributes:
 ```
 
 ### Encryption
+
 - **In Transit**: HTTPS (API Gateway, AWS SDK)
 - **At Rest**:
   - DynamoDB: AWS-managed encryption
@@ -210,17 +222,17 @@ Attributes:
 
 ## Cost Breakdown (Estimated)
 
-| Service | Usage | Cost/Month |
-|---------|-------|------------|
-| API Gateway HTTP API | 100K requests | $0.10 |
-| Lambda (webhook) | 100K invocations, 128 MB, 500ms avg | $0.02 |
-| Lambda (jobWorker) | 100K invocations, 256 MB, 1s avg | $0.08 |
-| DynamoDB | On-demand, 10K writes, 5K reads | $1.50 |
-| SQS | 100K requests | $0.04 |
-| CloudWatch Logs | 1 GB ingestion, 14-day retention | $0.50 |
-| SSM Parameter Store | 2 parameters | $0.00 |
-| KMS | 1 key, 1K requests | $1.00 |
-| **Total** | | **~$3.24/month** |
+| Service              | Usage                               | Cost/Month       |
+| -------------------- | ----------------------------------- | ---------------- |
+| API Gateway HTTP API | 100K requests                       | $0.10            |
+| Lambda (webhook)     | 100K invocations, 128 MB, 500ms avg | $0.02            |
+| Lambda (jobWorker)   | 100K invocations, 256 MB, 1s avg    | $0.08            |
+| DynamoDB             | On-demand, 10K writes, 5K reads     | $1.50            |
+| SQS                  | 100K requests                       | $0.04            |
+| CloudWatch Logs      | 1 GB ingestion, 14-day retention    | $0.50            |
+| SSM Parameter Store  | 2 parameters                        | $0.00            |
+| KMS                  | 1 key, 1K requests                  | $1.00            |
+| **Total**            |                                     | **~$3.24/month** |
 
 ## Scalability
 
@@ -234,7 +246,9 @@ Attributes:
 ## Monitoring & Observability
 
 ### CloudWatch Dashboards
+
 Create custom dashboard with:
+
 - API Gateway request count & latency
 - Lambda invocations, errors, duration
 - SQS queue depth, age of oldest message
@@ -242,11 +256,13 @@ Create custom dashboard with:
 - DynamoDB consumed capacity
 
 ### Alarms
+
 1. **Critical**: DLQ depth > 0 → SNS email
 2. **Warning**: Lambda errors > 5 in 5 min → SNS email
 3. **Info**: API Gateway 5XX > 10 in 5 min → SNS email
 
 ### X-Ray (Optional for M2)
+
 - Distributed tracing across API Gateway → Lambda → SQS → Lambda → DynamoDB
 - Identify bottlenecks and slow queries
 

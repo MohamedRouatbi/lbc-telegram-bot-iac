@@ -148,7 +148,17 @@ export class LbcTelegramBotStack extends cdk.Stack {
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'dist/src/lambdas/telegramWebhook/index.handler',
       code: lambda.Code.fromAsset(path.join(__dirname, '../..'), {
-        exclude: ['node_modules', 'cdk.out', 'tests', '.git', '*.md', 'docs', 'postman', '.env', 'src'],
+        exclude: [
+          'node_modules',
+          'cdk.out',
+          'tests',
+          '.git',
+          '*.md',
+          'docs',
+          'postman',
+          '.env',
+          'src',
+        ],
       }),
       environment: {
         SQS_QUEUE_URL: telegramEventsQueue.queueUrl,
@@ -167,7 +177,17 @@ export class LbcTelegramBotStack extends cdk.Stack {
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'dist/src/lambdas/jobWorker/index.handler',
       code: lambda.Code.fromAsset(path.join(__dirname, '../..'), {
-        exclude: ['node_modules', 'cdk.out', 'tests', '.git', '*.md', 'docs', 'postman', '.env', 'src'],
+        exclude: [
+          'node_modules',
+          'cdk.out',
+          'tests',
+          '.git',
+          '*.md',
+          'docs',
+          'postman',
+          '.env',
+          'src',
+        ],
       }),
       environment: {
         USERS_TABLE_NAME: usersTable.tableName,

@@ -36,11 +36,12 @@ aws sts get-caller-identity
 ```
 
 Expected output:
+
 ```json
 {
-    "UserId": "AIDAXXXXXXXXXXXXXXXXX",
-    "Account": "123456789012",
-    "Arn": "arn:aws:iam::123456789012:user/your-username"
+  "UserId": "AIDAXXXXXXXXXXXXXXXXX",
+  "Account": "123456789012",
+  "Arn": "arn:aws:iam::123456789012:user/your-username"
 }
 ```
 
@@ -55,6 +56,7 @@ notepad .env
 ```
 
 Update these values:
+
 ```
 AWS_REGION=us-east-1
 AWS_ACCOUNT_ID=123456789012  # From step 1.2
@@ -77,6 +79,7 @@ npx cdk bootstrap aws://123456789012/us-east-1
 ```
 
 Expected output:
+
 ```
 ✅  Environment aws://123456789012/us-east-1 bootstrapped
 ```
@@ -124,11 +127,13 @@ npm run cdk:deploy
 ```
 
 Or with auto-approval:
+
 ```powershell
 npx cdk deploy --require-approval never
 ```
 
 Expected output:
+
 ```
 ✅  lbc-telegram-bot-dev
 
@@ -240,6 +245,7 @@ curl -X POST "https://api.telegram.org/bot$BOT_TOKEN/setWebhook" `
 ```
 
 Expected response:
+
 ```json
 {
   "ok": true,
@@ -255,6 +261,7 @@ curl "https://api.telegram.org/bot$BOT_TOKEN/getWebhookInfo"
 ```
 
 Expected response:
+
 ```json
 {
   "ok": true,
@@ -329,6 +336,7 @@ aws logs tail /aws/lambda/jobWorker-dev --follow
 ```
 
 Look for:
+
 - "Message sent to SQS" in webhook logs
 - "Processing X messages from SQS" in jobWorker logs
 - "Record processed successfully" in jobWorker logs
@@ -414,21 +422,28 @@ aws ce get-cost-and-usage `
 ## Troubleshooting
 
 ### Issue: CDK deploy fails with "No stack named X"
+
 **Solution**: First deployment? This is normal. CDK will create the stack.
 
 ### Issue: Lambda can't read SSM parameters
-**Solution**: 
+
+**Solution**:
+
 1. Verify parameters exist: `aws ssm get-parameter --name "/lbc-telegram-bot/dev/telegram-bot-token"`
 2. Check Lambda IAM role has `ssm:GetParameter` permission
 
 ### Issue: Messages not appearing in DynamoDB
+
 **Solution**:
+
 1. Check SQS queue depth - are messages stuck?
 2. Check DLQ - are messages failing?
 3. Check jobWorker CloudWatch logs for errors
 
 ### Issue: Telegram says "Webhook is not set"
+
 **Solution**:
+
 ```powershell
 # Re-set webhook
 curl -X POST "https://api.telegram.org/bot$BOT_TOKEN/setWebhook" `
@@ -486,7 +501,7 @@ curl -X POST "https://api.telegram.org/bot$BOT_TOKEN/deleteWebhook"
 ✅ Postman collection to hit the webhook  
 ✅ Basic CI (lint/test)  
 ✅ curl/Postman → 200 from /telegram/webhook  
-✅ Message enqueued to SQS and consumed by jobWorker (CloudWatch log proves)  
+✅ Message enqueued to SQS and consumed by jobWorker (CloudWatch log proves)
 
 ## Artifacts Delivered
 
