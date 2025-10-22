@@ -48,11 +48,20 @@ export async function updateUser(
   const expressionAttributeNames: Record<string, string> = {};
   const expressionAttributeValues: Record<string, any> = {};
 
+  // Filter out undefined values before creating the update expression
   Object.entries(updates).forEach(([key, value], index) => {
-    updateExpressions.push(`#attr${index} = :val${index}`);
-    expressionAttributeNames[`#attr${index}`] = key;
-    expressionAttributeValues[`:val${index}`] = value;
+    if (value !== undefined) {
+      updateExpressions.push(`#attr${index} = :val${index}`);
+      expressionAttributeNames[`#attr${index}`] = key;
+      expressionAttributeValues[`:val${index}`] = value;
+    }
   });
+
+  // If no updates, skip the operation
+  if (updateExpressions.length === 0) {
+    console.log(`No updates for user: ${userId}`);
+    return;
+  }
 
   const command = new UpdateCommand({
     TableName: USERS_TABLE,

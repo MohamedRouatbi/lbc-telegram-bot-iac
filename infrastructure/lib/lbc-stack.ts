@@ -146,20 +146,8 @@ export class LbcTelegramBotStack extends cdk.Stack {
     const telegramWebhookLambda = new lambda.Function(this, 'TelegramWebhookLambda', {
       functionName: `telegramWebhook-${environment}${suffix}`,
       runtime: lambda.Runtime.NODEJS_20_X,
-      handler: 'dist/src/lambdas/telegramWebhook/index.handler',
-      code: lambda.Code.fromAsset(path.join(__dirname, '../..'), {
-        exclude: [
-          'node_modules',
-          'cdk.out',
-          'tests',
-          '.git',
-          '*.md',
-          'docs',
-          'postman',
-          '.env',
-          'src',
-        ],
-      }),
+      handler: 'src/lambdas/telegramWebhook/index.handler',
+      code: lambda.Code.fromAsset(path.join(__dirname, '../../lambda-deploy')),
       environment: {
         SQS_QUEUE_URL: telegramEventsQueue.queueUrl,
         ENVIRONMENT: environment,
@@ -175,20 +163,8 @@ export class LbcTelegramBotStack extends cdk.Stack {
     const jobWorkerLambda = new lambda.Function(this, 'JobWorkerLambda', {
       functionName: `jobWorker-${environment}${suffix}`,
       runtime: lambda.Runtime.NODEJS_20_X,
-      handler: 'dist/src/lambdas/jobWorker/index.handler',
-      code: lambda.Code.fromAsset(path.join(__dirname, '../..'), {
-        exclude: [
-          'node_modules',
-          'cdk.out',
-          'tests',
-          '.git',
-          '*.md',
-          'docs',
-          'postman',
-          '.env',
-          'src',
-        ],
-      }),
+      handler: 'src/lambdas/jobWorker/index.handler',
+      code: lambda.Code.fromAsset(path.join(__dirname, '../../lambda-deploy')),
       environment: {
         USERS_TABLE_NAME: usersTable.tableName,
         SESSIONS_TABLE_NAME: sessionsTable.tableName,
