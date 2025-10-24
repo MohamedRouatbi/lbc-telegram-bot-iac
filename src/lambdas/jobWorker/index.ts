@@ -2,6 +2,8 @@ import type { SQSEvent, SQSRecord } from 'aws-lambda';
 import { v4 as uuidv4 } from 'uuid';
 import type { TelegramEventMessage, EventRecord, UserRecord } from '../../lib/types';
 import { createEvent, createUser, getUser, updateUser } from '../../lib/dynamodb';
+import { handleStartCommand } from './startHandler';
+import { handleRestartCommand } from './restartHandler';
 
 /**
  * Lambda handler for SQS job worker
@@ -64,13 +66,28 @@ async function handleMessage(message: TelegramEventMessage): Promise<void> {
     text: telegramMessage.text,
   });
 
+  // Check for commands
+  const text = telegramMessage.text || '';
+
+  if (text.startsWith('/start')) {
+    console.log('Detected /start command');
+    await handleStartCommand(telegramMessage);
+    return;
+  }
+
+  if (text.startsWith('/restart')) {
+    console.log('Detected /restart command');
+    await handleRestartCommand(telegramMessage);
+    return;
+  }
+
   // Upsert user if message has sender
   if (telegramMessage.from) {
     await upsertUser(telegramMessage.from);
   }
 
   // Here you would add your business logic
-  // For M1, we just log the message
+  // For now, we just log the message
   console.log('Message processed:', {
     from: telegramMessage.from?.username,
     text: telegramMessage.text,

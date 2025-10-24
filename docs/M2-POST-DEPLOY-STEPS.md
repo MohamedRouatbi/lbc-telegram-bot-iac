@@ -134,16 +134,19 @@ After deployment, note these outputs:
 ## Troubleshooting
 
 ### Signed URL returns 403 Forbidden
+
 - Verify CloudFront public key is updated (not placeholder)
 - Check private key in Secrets Manager matches public key
 - Verify Lambda has permission to read the secret
 
 ### TTS generation fails
+
 - Check Lambda has `polly:SynthesizeSpeech` permission
 - Verify Lambda has S3 PutObject permission on TTS bucket
 - Check KMS key grants to Lambda role
 
 ### Videos not accessible
+
 - Verify files uploaded to correct S3 path: `media/welcome/v1/welcome_<lang>.mp4`
 - Check CloudFront distribution is deployed (not "In Progress")
 - Verify OAC is configured correctly on both S3 bucket and CloudFront

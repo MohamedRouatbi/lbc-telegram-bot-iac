@@ -121,10 +121,16 @@ export class LbcTelegramBotStack extends cdk.Stack {
       signing: cloudfront.Signing.SIGV4_NO_OVERRIDE,
     });
 
-    // CloudFront Public Key (placeholder - will be updated manually)
+    // CloudFront Public Key (for signed URLs)
     const publicKey = new cloudfront.PublicKey(this, 'SigningPublicKey', {
       encodedKey: `-----BEGIN PUBLIC KEY-----
-PLACEHOLDER-UPDATE-AFTER-GENERATING-KEY-PAIR
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAu4SdLhQOysQ6QEaEaHxN
+i8Fdip3LnN5QUqX9tyGIVb2Y8IY70EGi66n47IT4vMNtv3RMX6xUFRIrCVdAyzBl
+KG4ZawJwc6yuQcvk0wHxYvj856pt4J9eoQywDpGe91hgr7j7naVgidP42MNV8JPT
+HAolUxbLES+l3lgaFJOuqHR5iX7ZxeMef8TsfaSdK3+mrPL9j7twsUjyzp8UEcUL
+vo7yhb8WSWXLIA5cnpIlfuvXVHcKEQx0izXobqDEiu7hcOZZXrIPE2y9JB1axJ9F
+uegjGQm8/ngHOHz7G4eobwN+KCe5d55uZREoVGzrD8Xo2XquM3RdpzEhnA4VKR7v
+wQIDAQAB
 -----END PUBLIC KEY-----`,
       comment: 'Public key for CloudFront signed URLs',
     });
@@ -284,7 +290,7 @@ PLACEHOLDER-UPDATE-AFTER-GENERATING-KEY-PAIR
     // Webhook Lambda
     const telegramWebhookLambda = new lambda.Function(this, 'TelegramWebhookLambda', {
       functionName: `telegramWebhook-${environment}${suffix}`,
-      runtime: lambda.Runtime.NODEJS_20_X,
+      runtime: lambda.Runtime.NODEJS_18_X,
       handler: 'src/lambdas/telegramWebhook/index.handler',
       code: lambda.Code.fromAsset(path.join(__dirname, '../../lambda-deploy')),
       environment: {
@@ -301,7 +307,7 @@ PLACEHOLDER-UPDATE-AFTER-GENERATING-KEY-PAIR
     // Job Worker Lambda
     const jobWorkerLambda = new lambda.Function(this, 'JobWorkerLambda', {
       functionName: `jobWorker-${environment}${suffix}`,
-      runtime: lambda.Runtime.NODEJS_20_X,
+      runtime: lambda.Runtime.NODEJS_18_X,
       handler: 'src/lambdas/jobWorker/index.handler',
       code: lambda.Code.fromAsset(path.join(__dirname, '../../lambda-deploy')),
       environment: {
@@ -312,9 +318,7 @@ PLACEHOLDER-UPDATE-AFTER-GENERATING-KEY-PAIR
         // M2: Media & TTS environment variables
         ASSETS_BUCKET: assetsBucket.bucketName,
         TTS_BUCKET: ttsBucket.bucketName,
-        CF_DOMAIN: distribution.distributionDomainName,
-        CF_KEY_PAIR_ID: publicKey.publicKeyId,
-        CF_PRIVATE_KEY_SECRET_ARN: cfPrivateKeySecret.secretArn,
+        TELEGRAM_BOT_TOKEN_SECRET_ARN: telegramBotTokenSecret.secretArn,
         KMS_KEY_ARN: s3KmsKey.keyArn,
       },
       timeout: cdk.Duration.seconds(60),
@@ -338,17 +342,17 @@ PLACEHOLDER-UPDATE-AFTER-GENERATING-KEY-PAIR
 
     kmsKey.grantDecrypt(jobWorkerLambda);
 
-    // M2: Grant S3, Polly, Secrets Manager, and KMS permissions
+    // M2: Grant S3, Polly, and KMS permissions
     // S3 Read permissions (assets bucket - welcome videos)
-    assetsBucket.grantRead(jobWorkerLambda, 'media/welcome/*');
-    
+    assetsBucket.grantRead(jobWorkerLambda);
+
     // S3 Read/Write permissions (TTS bucket - user-scoped)
     ttsBucket.grantRead(jobWorkerLambda);
     ttsBucket.grantPut(jobWorkerLambda, 'tts/*');
-    
+
     // KMS permissions for S3 encryption
     s3KmsKey.grantEncryptDecrypt(jobWorkerLambda);
-    
+
     // Polly permissions
     jobWorkerLambda.addToRolePolicy(
       new iam.PolicyStatement({
@@ -361,9 +365,8 @@ PLACEHOLDER-UPDATE-AFTER-GENERATING-KEY-PAIR
         },
       })
     );
-    
+
     // Secrets Manager permissions
-    cfPrivateKeySecret.grantRead(jobWorkerLambda);
     telegramBotTokenSecret.grantRead(jobWorkerLambda);
 
     // Add SQS trigger to Job Worker

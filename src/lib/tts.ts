@@ -11,29 +11,29 @@ const s3 = new S3Client({});
 
 // Voice mapping by language
 const VOICE_MAP: Record<string, VoiceId> = {
-  en: 'Matthew',      // US English, neural
-  es: 'Lucia',        // Spanish (Mexico/Latin America), neural
+  en: 'Matthew', // US English, neural
+  es: 'Lucia', // Spanish (Mexico/Latin America), neural
   'es-MX': 'Lucia',
   'es-ES': 'Lucia',
-  'es-DO': 'Lucia',   // Dominican Republic
+  'es-DO': 'Lucia', // Dominican Republic
 };
 
 // Greeting text by language
 const GREETING_TEXT: Record<string, string> = {
   en: "Welcome to Latina Beauty Collection. I'm your concierge. Tap Start to begin.",
-  es: "Bienvenido a Latina Beauty Collection. Soy tu concierge. Toca Empezar para comenzar.",
+  es: 'Bienvenido a Latina Beauty Collection. Soy tu concierge. Toca Empezar para comenzar.',
 };
 
 export interface TTSParams {
   userId: string;
-  lang: string;         // 'en', 'es', etc.
-  bucket: string;       // TTS S3 bucket
-  kmsKeyId?: string;    // KMS CMK ARN for SSE-KMS
+  lang: string; // 'en', 'es', etc.
+  bucket: string; // TTS S3 bucket
+  kmsKeyId?: string; // KMS CMK ARN for SSE-KMS
 }
 
 export interface TTSResult {
-  s3Key: string;        // e.g., 'tts/telegram_123/en/greeting_v1.mp3'
-  cached: boolean;      // true if reused from cache, false if newly generated
+  s3Key: string; // e.g., 'tts/telegram_123/en/greeting_v1.mp3'
+  cached: boolean; // true if reused from cache, false if newly generated
 }
 
 /**
@@ -64,7 +64,7 @@ export async function getOrCreateGreeting(params: TTSParams): Promise<TTSResult>
 
   // Step 2: Generate with Polly
   console.log(`TTS cache miss, generating with Polly: ${s3Key}`);
-  
+
   const voice = VOICE_MAP[normalizedLang] || 'Matthew';
   const text = GREETING_TEXT[normalizedLang] || GREETING_TEXT.en;
 

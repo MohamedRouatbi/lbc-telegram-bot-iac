@@ -59,6 +59,25 @@ export interface UserRecord {
   languageCode?: string;
   createdAt: string;
   updatedAt: string;
+  // M2: Onboarding state
+  state?: 'NEW' | 'WELCOME_VIDEO_SENT' | 'TTS_SENT' | 'DONE';
+  state_progress?: string[]; // Array of "STATE@timestamp"
+  first_start_ts?: string;
+  last_start_ts?: string;
+  // M2: Referral tracking
+  ref_code?: string;
+  utm?: {
+    source?: string;
+    medium?: string;
+    campaign?: string;
+    content?: string;
+  };
+  // M2: TTS metadata
+  tts_key?: string; // S3 key
+  tts_voice?: string;
+  tts_lang?: string;
+  // M2: Idempotency
+  idempotency_ttl?: number; // TTL for cleanup
 }
 
 export interface SessionRecord {

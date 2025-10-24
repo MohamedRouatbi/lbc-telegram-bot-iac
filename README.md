@@ -1,8 +1,10 @@
 ﻿# LBC Telegram Bot - AWS Serverless Infrastructure
 
-> **M1 Milestone Complete** - Minimal AWS Stack & Dev Scaffolding
+> **M2 Milestone Complete** ✅ - Onboarding Flow with AI TTS & Media Delivery
 
 A production-ready serverless Telegram bot built on AWS with Infrastructure-as-Code using AWS CDK.
+
+**Features:** `/start` command with referral tracking, welcome video delivery, AI-powered TTS greetings (Amazon Polly), resumable FSM state, S3 pre-signed URLs, bilingual support (EN/ES).
 
 ---
 
@@ -129,23 +131,25 @@ aws dynamodb scan --table-name lbc-events-dev-v2
 
 ---
 
-## 🎯 M1 Complete
+## 🎯 M2 Complete (October 24, 2025)
 
-✅ Infrastructure deployed (30+ AWS resources)  
+✅ Infrastructure deployed (40+ AWS resources)  
 ✅ Telegram webhook working  
-✅ Messages stored in DynamoDB  
-✅ Unit tests passing (5/5)  
-✅ Postman collection ready  
-✅ CI/CD pipeline configured  
-✅ Documentation complete
+✅ `/start` command with referral/UTM tracking  
+✅ Welcome video delivery (S3 pre-signed URLs)  
+✅ AI TTS greetings (Amazon Polly) with S3 caching  
+✅ Resumable FSM state machine  
+✅ `/restart` command for QA testing  
+✅ User tested and verified working  
+✅ **See M2-COMPLETE.md for full details**
 
 ---
 
 ## 📝 Next Steps
 
-**M2:** Bot commands (/start, /help) + responses  
-**M3:** Business features + external APIs  
-**M4:** Production hardening + monitoring
+**M3:** Observability (CloudWatch dashboards, X-Ray tracing)  
+**M4:** Security hardening (WAF, webhook signature validation)  
+**M5:** Production deployment (multi-region, backups)
 
 ---
 

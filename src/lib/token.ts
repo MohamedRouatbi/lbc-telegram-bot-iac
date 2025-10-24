@@ -29,7 +29,7 @@ export function decodeStartToken(token?: string): StartAttrs {
     // base64url decode: replace URL-safe chars and decode
     const padded = token.replace(/-/g, '+').replace(/_/g, '/');
     const json = Buffer.from(padded, 'base64').toString('utf8');
-    
+
     // Expected format: ref_code|utm_source|utm_medium|utm_campaign|nonce|ts
     const parts = json.split('|');
     const [ref_code, utm_source, utm_medium, utm_campaign, nonce, tsStr] = parts;
@@ -37,7 +37,7 @@ export function decodeStartToken(token?: string): StartAttrs {
     const result: StartAttrs = {};
 
     if (ref_code) result.ref_code = ref_code;
-    
+
     if (utm_source || utm_medium || utm_campaign) {
       result.utm = {
         source: utm_source || undefined,
@@ -65,5 +65,5 @@ export function decodeStartToken(token?: string): StartAttrs {
 export function isTokenValid(attrs: StartAttrs, maxAgeSeconds: number = 7 * 24 * 60 * 60): boolean {
   if (!attrs.ts) return true; // If no timestamp, accept it
   const now = Math.floor(Date.now() / 1000);
-  return (now - attrs.ts) <= maxAgeSeconds;
+  return now - attrs.ts <= maxAgeSeconds;
 }
