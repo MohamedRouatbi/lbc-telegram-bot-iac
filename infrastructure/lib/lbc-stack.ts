@@ -101,6 +101,13 @@ export class LbcTelegramBotStack extends cdk.Stack {
       secretStringValue: cdk.SecretValue.unsafePlainText('PLACEHOLDER-UPDATE-AFTER-DEPLOY'),
     });
 
+    // M3: Webhook secret for validating Telegram requests
+    const webhookSecret = new secretsmanager.Secret(this, 'TelegramWebhookSecret', {
+      secretName: `/lbc/tg_webhook_secret-${environment}${suffix}`,
+      description: 'Telegram Webhook Secret Token for request validation',
+      secretStringValue: cdk.SecretValue.unsafePlainText('PLACEHOLDER-UPDATE-AFTER-DEPLOY'),
+    });
+
     const cfPrivateKeySecret = new secretsmanager.Secret(this, 'CloudFrontPrivateKeySecret', {
       secretName: `/lbc/cf/privateKey-${environment}${suffix}`,
       description: 'CloudFront private key (PEM) for signed URLs',
@@ -295,6 +302,7 @@ wQIDAQAB
       code: lambda.Code.fromAsset(path.join(__dirname, '../../lambda-deploy')),
       environment: {
         SQS_QUEUE_URL: telegramEventsQueue.queueUrl,
+        TELEGRAM_WEBHOOK_SECRET_ARN: webhookSecret.secretArn,
         ENVIRONMENT: environment,
       },
       timeout: cdk.Duration.seconds(30),
@@ -303,6 +311,7 @@ wQIDAQAB
 
     // Grant permissions
     telegramEventsQueue.grantSendMessages(telegramWebhookLambda);
+    webhookSecret.grantRead(telegramWebhookLambda);
 
     // Job Worker Lambda
     const jobWorkerLambda = new lambda.Function(this, 'JobWorkerLambda', {

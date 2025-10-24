@@ -1,6 +1,7 @@
 import type { APIGatewayProxyResult } from 'aws-lambda';
 import { SQSClient, SendMessageCommand } from '@aws-sdk/client-sqs';
 import type { TelegramUpdate, TelegramEventMessage } from '../../lib/types';
+import { validateWebhookRequest } from '../../lib/webhookValidator';
 
 // Support both API Gateway v1 and v2 event formats
 interface APIGatewayEvent {
@@ -32,7 +33,7 @@ export async function handler(event: APIGatewayEvent): Promise<APIGatewayProxyRe
   console.log('Received webhook request', {
     method: httpMethod,
     path: path,
-    headers: event.headers,
+    hasSecretToken: !!event.headers['x-telegram-bot-api-secret-token'],
   });
 
   try {
@@ -43,6 +44,22 @@ export async function handler(event: APIGatewayEvent): Promise<APIGatewayProxyRe
         body: JSON.stringify({ error: 'Method Not Allowed' }),
       };
     }
+
+    // Validate webhook signature (case-insensitive header lookup)
+    const secretToken =
+      event.headers['x-telegram-bot-api-secret-token'] ||
+      event.headers['X-Telegram-Bot-Api-Secret-Token'];
+
+    const isValid = await validateWebhookRequest(secretToken);
+    if (!isValid) {
+      console.warn('Webhook validation failed - rejecting request');
+      return {
+        statusCode: 401,
+        body: JSON.stringify({ error: 'Unauthorized' }),
+      };
+    }
+
+    console.log('Webhook validation successful');
 
     // Parse the Telegram update
     if (!event.body) {
