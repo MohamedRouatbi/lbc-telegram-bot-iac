@@ -13,6 +13,10 @@ import * as cloudwatch from 'aws-cdk-lib/aws-cloudwatch';
 import * as cloudwatch_actions from 'aws-cdk-lib/aws-cloudwatch-actions';
 import * as sns from 'aws-cdk-lib/aws-sns';
 import * as sns_subscriptions from 'aws-cdk-lib/aws-sns-subscriptions';
+import * as s3 from 'aws-cdk-lib/aws-s3';
+import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
+import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
+import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import { Construct } from 'constructs';
 import * as path from 'path';
 
@@ -35,6 +39,140 @@ export class LbcTelegramBotStack extends cdk.Stack {
     kmsKey.addAlias(`alias/lbc-telegram-bot-${environment}${suffix}`);
 
     // ============================================
+    // M2: KMS Key for S3 Objects (Media & TTS)
+    // ============================================
+    const s3KmsKey = new kms.Key(this, 'S3EncryptionKey', {
+      description: 'KMS key for encrypting S3 objects (media assets and TTS)',
+      enableKeyRotation: true,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
+    s3KmsKey.addAlias(`alias/lbc-bot-${environment}${suffix}`);
+
+    // ============================================
+    // M2: S3 Buckets for Media & TTS
+    // ============================================
+
+    // Assets Bucket (welcome videos)
+    const assetsBucket = new s3.Bucket(this, 'AssetsBucket', {
+      bucketName: `lbc-telegram-onboarding-assets-${environment}${suffix}-${this.account}`,
+      encryption: s3.BucketEncryption.KMS,
+      encryptionKey: s3KmsKey,
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+      autoDeleteObjects: true,
+      versioned: true,
+      lifecycleRules: [
+        {
+          id: 'DeleteOldVersions',
+          noncurrentVersionExpiration: cdk.Duration.days(90),
+        },
+      ],
+    });
+
+    // TTS Bucket (cached AI voice greetings)
+    const ttsBucket = new s3.Bucket(this, 'TTSBucket', {
+      bucketName: `lbc-telegram-onboarding-tts-${environment}${suffix}-${this.account}`,
+      encryption: s3.BucketEncryption.KMS,
+      encryptionKey: s3KmsKey,
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+      autoDeleteObjects: true,
+      lifecycleRules: [
+        {
+          id: 'TransitionToIA',
+          transitions: [
+            {
+              storageClass: s3.StorageClass.INFREQUENT_ACCESS,
+              transitionAfter: cdk.Duration.days(30),
+            },
+          ],
+        },
+      ],
+    });
+
+    // ============================================
+    // M2: Secrets Manager for Bot Token & CloudFront Key
+    // ============================================
+
+    const telegramBotTokenSecret = new secretsmanager.Secret(this, 'TelegramBotTokenSecret', {
+      secretName: `/lbc/tg_bot_token-${environment}${suffix}`,
+      description: 'Telegram Bot Token for M2',
+      secretStringValue: cdk.SecretValue.unsafePlainText('PLACEHOLDER-UPDATE-AFTER-DEPLOY'),
+    });
+
+    const cfPrivateKeySecret = new secretsmanager.Secret(this, 'CloudFrontPrivateKeySecret', {
+      secretName: `/lbc/cf/privateKey-${environment}${suffix}`,
+      description: 'CloudFront private key (PEM) for signed URLs',
+      secretStringValue: cdk.SecretValue.unsafePlainText('PLACEHOLDER-UPDATE-AFTER-DEPLOY'),
+    });
+
+    // ============================================
+    // M2: CloudFront Distribution with OAC
+    // ============================================
+
+    // Origin Access Control for assets bucket
+    const assetsOac = new cloudfront.S3OriginAccessControl(this, 'AssetsOAC', {
+      signing: cloudfront.Signing.SIGV4_NO_OVERRIDE,
+    });
+
+    // Origin Access Control for TTS bucket
+    const ttsOac = new cloudfront.S3OriginAccessControl(this, 'TTSOAC', {
+      signing: cloudfront.Signing.SIGV4_NO_OVERRIDE,
+    });
+
+    // CloudFront Public Key (placeholder - will be updated manually)
+    const publicKey = new cloudfront.PublicKey(this, 'SigningPublicKey', {
+      encodedKey: `-----BEGIN PUBLIC KEY-----
+PLACEHOLDER-UPDATE-AFTER-GENERATING-KEY-PAIR
+-----END PUBLIC KEY-----`,
+      comment: 'Public key for CloudFront signed URLs',
+    });
+
+    const keyGroup = new cloudfront.KeyGroup(this, 'SigningKeyGroup', {
+      items: [publicKey],
+      comment: 'Key group for signed URL validation',
+    });
+
+    // Cache Policy (short TTL for signed URLs)
+    const cachePolicy = new cloudfront.CachePolicy(this, 'SignedUrlCachePolicy', {
+      cachePolicyName: `lbc-signed-url-cache-${environment}${suffix}`,
+      comment: 'Cache policy for signed URLs with short TTL',
+      defaultTtl: cdk.Duration.minutes(10),
+      maxTtl: cdk.Duration.minutes(15),
+      minTtl: cdk.Duration.minutes(5),
+      enableAcceptEncodingGzip: true,
+      enableAcceptEncodingBrotli: true,
+    });
+
+    // CloudFront Distribution
+    const distribution = new cloudfront.Distribution(this, 'MediaDistribution', {
+      comment: `LBC Media Distribution - ${environment}${suffix}`,
+      defaultBehavior: {
+        origin: origins.S3BucketOrigin.withOriginAccessControl(assetsBucket, {
+          originAccessControl: assetsOac,
+        }),
+        viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+        allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD,
+        cachePolicy,
+        trustedKeyGroups: [keyGroup],
+      },
+      additionalBehaviors: {
+        'tts/*': {
+          origin: origins.S3BucketOrigin.withOriginAccessControl(ttsBucket, {
+            originAccessControl: ttsOac,
+          }),
+          viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+          allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD,
+          cachePolicy,
+          trustedKeyGroups: [keyGroup],
+        },
+      },
+      priceClass: cloudfront.PriceClass.PRICE_CLASS_100, // North America & Europe only
+      enableLogging: true,
+    });
+
+    // ============================================
     // DynamoDB Tables
     // ============================================
 
@@ -46,6 +184,7 @@ export class LbcTelegramBotStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.DESTROY,
       pointInTimeRecovery: true,
       encryption: dynamodb.TableEncryption.AWS_MANAGED,
+      timeToLiveAttribute: 'idempotency_ttl', // M2: Enable TTL for idempotency keys
     });
 
     // Sessions Table with GSI
@@ -170,6 +309,13 @@ export class LbcTelegramBotStack extends cdk.Stack {
         SESSIONS_TABLE_NAME: sessionsTable.tableName,
         EVENTS_TABLE_NAME: eventsTable.tableName,
         ENVIRONMENT: environment,
+        // M2: Media & TTS environment variables
+        ASSETS_BUCKET: assetsBucket.bucketName,
+        TTS_BUCKET: ttsBucket.bucketName,
+        CF_DOMAIN: distribution.distributionDomainName,
+        CF_KEY_PAIR_ID: publicKey.publicKeyId,
+        CF_PRIVATE_KEY_SECRET_ARN: cfPrivateKeySecret.secretArn,
+        KMS_KEY_ARN: s3KmsKey.keyArn,
       },
       timeout: cdk.Duration.seconds(60),
       memorySize: 512,
@@ -191,6 +337,34 @@ export class LbcTelegramBotStack extends cdk.Stack {
     );
 
     kmsKey.grantDecrypt(jobWorkerLambda);
+
+    // M2: Grant S3, Polly, Secrets Manager, and KMS permissions
+    // S3 Read permissions (assets bucket - welcome videos)
+    assetsBucket.grantRead(jobWorkerLambda, 'media/welcome/*');
+    
+    // S3 Read/Write permissions (TTS bucket - user-scoped)
+    ttsBucket.grantRead(jobWorkerLambda);
+    ttsBucket.grantPut(jobWorkerLambda, 'tts/*');
+    
+    // KMS permissions for S3 encryption
+    s3KmsKey.grantEncryptDecrypt(jobWorkerLambda);
+    
+    // Polly permissions
+    jobWorkerLambda.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ['polly:SynthesizeSpeech'],
+        resources: ['*'], // Polly doesn't support resource-level permissions
+        conditions: {
+          StringEquals: {
+            'aws:RequestedRegion': this.region,
+          },
+        },
+      })
+    );
+    
+    // Secrets Manager permissions
+    cfPrivateKeySecret.grantRead(jobWorkerLambda);
+    telegramBotTokenSecret.grantRead(jobWorkerLambda);
 
     // Add SQS trigger to Job Worker
     jobWorkerLambda.addEventSource(
@@ -280,6 +454,41 @@ export class LbcTelegramBotStack extends cdk.Stack {
 
     dlqAlarm.addAlarmAction(new cloudwatch_actions.SnsAction(alarmTopic));
 
+    // M2: Alarm for Lambda Duration (p95 latency)
+    const jobWorkerLatencyAlarm = new cloudwatch.Alarm(this, 'JobWorkerLatencyAlarm', {
+      metric: jobWorkerLambda.metricDuration({
+        statistic: 'p95',
+        period: cdk.Duration.minutes(5),
+      }),
+      threshold: 30000, // 30 seconds (p95)
+      evaluationPeriods: 2,
+      alarmName: `lbc-job-worker-latency-${environment}`,
+      alarmDescription: 'Job worker Lambda p95 latency exceeds 30s',
+      treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+    });
+
+    jobWorkerLatencyAlarm.addAlarmAction(new cloudwatch_actions.SnsAction(alarmTopic));
+
+    // M2: Alarm for DynamoDB Throttles
+    const dynamoThrottleAlarm = new cloudwatch.Alarm(this, 'DynamoThrottleAlarm', {
+      metric: new cloudwatch.Metric({
+        namespace: 'AWS/DynamoDB',
+        metricName: 'UserErrors',
+        dimensionsMap: {
+          TableName: usersTable.tableName,
+        },
+        statistic: 'Sum',
+        period: cdk.Duration.minutes(5),
+      }),
+      threshold: 5,
+      evaluationPeriods: 1,
+      alarmName: `lbc-dynamodb-throttles-${environment}`,
+      alarmDescription: 'DynamoDB throttling or user errors detected',
+      treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+    });
+
+    dynamoThrottleAlarm.addAlarmAction(new cloudwatch_actions.SnsAction(alarmTopic));
+
     // ============================================
     // Outputs
     // ============================================
@@ -313,6 +522,47 @@ export class LbcTelegramBotStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'DLQueueURL', {
       value: dlq.queueUrl,
       description: 'Dead Letter Queue URL',
+    });
+
+    // M2: Outputs
+    new cdk.CfnOutput(this, 'AssetsBucketName', {
+      value: assetsBucket.bucketName,
+      description: 'S3 Bucket for welcome videos and media assets',
+    });
+
+    new cdk.CfnOutput(this, 'TTSBucketName', {
+      value: ttsBucket.bucketName,
+      description: 'S3 Bucket for cached TTS audio files',
+    });
+
+    new cdk.CfnOutput(this, 'CloudFrontDomain', {
+      value: distribution.distributionDomainName,
+      description: 'CloudFront distribution domain (for signed URLs)',
+    });
+
+    new cdk.CfnOutput(this, 'CloudFrontDistributionId', {
+      value: distribution.distributionId,
+      description: 'CloudFront distribution ID',
+    });
+
+    new cdk.CfnOutput(this, 'PublicKeyId', {
+      value: publicKey.publicKeyId,
+      description: 'CloudFront Public Key ID (for signing)',
+    });
+
+    new cdk.CfnOutput(this, 'TelegramBotTokenSecretArn', {
+      value: telegramBotTokenSecret.secretArn,
+      description: 'Telegram Bot Token Secret ARN',
+    });
+
+    new cdk.CfnOutput(this, 'CloudFrontPrivateKeySecretArn', {
+      value: cfPrivateKeySecret.secretArn,
+      description: 'CloudFront Private Key Secret ARN',
+    });
+
+    new cdk.CfnOutput(this, 'S3KMSKeyArn', {
+      value: s3KmsKey.keyArn,
+      description: 'KMS Key ARN for S3 encryption',
     });
   }
 }

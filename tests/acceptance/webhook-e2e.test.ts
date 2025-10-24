@@ -1,6 +1,6 @@
 /**
  * End-to-End Acceptance Tests for Telegram Webhook
- * 
+ *
  * These tests verify the entire flow from webhook to DynamoDB
  * Run against a deployed stack in AWS
  */
@@ -10,7 +10,9 @@ import { DynamoDBClient, GetItemCommand, ScanCommand } from '@aws-sdk/client-dyn
 import { unmarshall } from '@aws-sdk/util-dynamodb';
 
 // Configuration from environment
-const WEBHOOK_URL = process.env.WEBHOOK_URL || 'https://1mi1qv7d67.execute-api.us-east-1.amazonaws.com/telegram/webhook';
+const WEBHOOK_URL =
+  process.env.WEBHOOK_URL ||
+  'https://1mi1qv7d67.execute-api.us-east-1.amazonaws.com/telegram/webhook';
 const AWS_REGION = process.env.AWS_REGION || 'us-east-1';
 const EVENTS_TABLE = process.env.EVENTS_TABLE_NAME || 'lbc-events-dev-v2';
 const USERS_TABLE = process.env.USERS_TABLE_NAME || 'lbc-users-dev-v2';
@@ -78,9 +80,13 @@ describe('E2E: Telegram Webhook Flow', () => {
 
     it('should reject invalid payload with 400', async () => {
       try {
-        await axios.post(WEBHOOK_URL, { invalid: 'data' }, {
-          headers: { 'Content-Type': 'application/json' },
-        });
+        await axios.post(
+          WEBHOOK_URL,
+          { invalid: 'data' },
+          {
+            headers: { 'Content-Type': 'application/json' },
+          }
+        );
         fail('Should have thrown 400 error');
       } catch (error: any) {
         expect(error.response.status).toBe(400);
@@ -91,7 +97,7 @@ describe('E2E: Telegram Webhook Flow', () => {
   describe('DynamoDB Data Persistence', () => {
     it('should create user record in DynamoDB', async () => {
       // Wait for async processing
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      await new Promise((resolve) => setTimeout(resolve, 3000));
 
       const command = new GetItemCommand({
         TableName: USERS_TABLE,
@@ -101,7 +107,7 @@ describe('E2E: Telegram Webhook Flow', () => {
       });
 
       const result = await dynamoClient.send(command);
-      
+
       if (!result.Item) {
         throw new Error('User not found in DynamoDB');
       }

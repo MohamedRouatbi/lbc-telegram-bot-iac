@@ -28,7 +28,7 @@ export async function handler(event: APIGatewayEvent): Promise<APIGatewayProxyRe
   // Support both API Gateway v1 and v2 formats
   const httpMethod = event.httpMethod || event.requestContext?.http?.method;
   const path = event.path || event.requestContext?.http?.path || event.rawPath;
-  
+
   console.log('Received webhook request', {
     method: httpMethod,
     path: path,
