@@ -17,6 +17,7 @@ import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
 import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
+import * as wafv2 from 'aws-cdk-lib/aws-wafv2';
 import { Construct } from 'constructs';
 import * as path from 'path';
 
@@ -158,9 +159,80 @@ wQIDAQAB
       enableAcceptEncodingBrotli: true,
     });
 
+    // ============================================
+    // M3: WAF Web ACL for CloudFront
+    // ============================================
+
+    // Note: WAF for CloudFront MUST be created in us-east-1 region
+    const webAcl = new wafv2.CfnWebACL(this, 'CloudFrontWebACL', {
+      scope: 'CLOUDFRONT',
+      defaultAction: { allow: {} },
+      name: `lbc-cloudfront-waf-${environment}${suffix}`,
+      description: 'WAF Web ACL for CloudFront distribution - protects against common threats',
+      visibilityConfig: {
+        cloudWatchMetricsEnabled: true,
+        metricName: `lbc-cloudfront-waf-${environment}${suffix}`,
+        sampledRequestsEnabled: true,
+      },
+      rules: [
+        // Rule 1: AWS Managed - Core Rule Set (CRS)
+        {
+          name: 'AWSManagedRulesCommonRuleSet',
+          priority: 1,
+          statement: {
+            managedRuleGroupStatement: {
+              vendorName: 'AWS',
+              name: 'AWSManagedRulesCommonRuleSet',
+            },
+          },
+          overrideAction: { none: {} },
+          visibilityConfig: {
+            cloudWatchMetricsEnabled: true,
+            metricName: 'AWSManagedRulesCommonRuleSetMetric',
+            sampledRequestsEnabled: true,
+          },
+        },
+        // Rule 2: AWS Managed - Known Bad Inputs
+        {
+          name: 'AWSManagedRulesKnownBadInputsRuleSet',
+          priority: 2,
+          statement: {
+            managedRuleGroupStatement: {
+              vendorName: 'AWS',
+              name: 'AWSManagedRulesKnownBadInputsRuleSet',
+            },
+          },
+          overrideAction: { none: {} },
+          visibilityConfig: {
+            cloudWatchMetricsEnabled: true,
+            metricName: 'AWSManagedRulesKnownBadInputsRuleSetMetric',
+            sampledRequestsEnabled: true,
+          },
+        },
+        // Rule 3: Rate-based rule - Block IPs exceeding 2000 requests per 5 minutes
+        {
+          name: 'RateLimitRule',
+          priority: 3,
+          statement: {
+            rateBasedStatement: {
+              limit: 2000,
+              aggregateKeyType: 'IP',
+            },
+          },
+          action: { block: {} },
+          visibilityConfig: {
+            cloudWatchMetricsEnabled: true,
+            metricName: 'RateLimitRuleMetric',
+            sampledRequestsEnabled: true,
+          },
+        },
+      ],
+    });
+
     // CloudFront Distribution
     const distribution = new cloudfront.Distribution(this, 'MediaDistribution', {
       comment: `LBC Media Distribution - ${environment}${suffix}`,
+      webAclId: webAcl.attrArn, // Attach WAF directly
       defaultBehavior: {
         origin: origins.S3BucketOrigin.withOriginAccessControl(assetsBucket, {
           originAccessControl: assetsOac,
@@ -388,7 +460,7 @@ wQIDAQAB
     );
 
     // ============================================
-    // API Gateway HTTP API
+    // API Gateway HTTP API with Throttling
     // ============================================
 
     const httpApi = new apigatewayv2.HttpApi(this, 'TelegramWebhookApi', {
@@ -409,6 +481,17 @@ wQIDAQAB
         telegramWebhookLambda
       ),
     });
+
+    // Apply throttle settings to the default stage
+    // Telegram recommends: "no more than 30 messages per second"
+    // We'll be conservative: 50 req/sec with burst of 100
+    const cfnStage = httpApi.defaultStage?.node.defaultChild as apigatewayv2.CfnStage;
+    if (cfnStage) {
+      cfnStage.defaultRouteSettings = {
+        throttlingBurstLimit: 100, // Max concurrent requests
+        throttlingRateLimit: 50, // Requests per second
+      };
+    }
 
     // ============================================
     // CloudWatch Alarms
@@ -500,6 +583,50 @@ wQIDAQAB
     });
 
     dynamoThrottleAlarm.addAlarmAction(new cloudwatch_actions.SnsAction(alarmTopic));
+
+    // M3: Alarm for API Gateway Throttles
+    const apiThrottleAlarm = new cloudwatch.Alarm(this, 'ApiThrottleAlarm', {
+      metric: new cloudwatch.Metric({
+        namespace: 'AWS/ApiGateway',
+        metricName: 'Count',
+        dimensionsMap: {
+          ApiId: httpApi.httpApiId,
+        },
+        statistic: 'Sum',
+        period: cdk.Duration.minutes(5),
+      }),
+      threshold: 100, // Alert if more than 100 throttled requests in 5 minutes
+      evaluationPeriods: 1,
+      alarmName: `lbc-api-throttles-${environment}`,
+      alarmDescription: 'API Gateway throttling detected - potential DoS attack or traffic spike',
+      treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
+    });
+
+    apiThrottleAlarm.addAlarmAction(new cloudwatch_actions.SnsAction(alarmTopic));
+
+    // M3: Alarm for WAF Blocked Requests
+    const wafBlockedAlarm = new cloudwatch.Alarm(this, 'WafBlockedAlarm', {
+      metric: new cloudwatch.Metric({
+        namespace: 'AWS/WAFV2',
+        metricName: 'BlockedRequests',
+        dimensionsMap: {
+          Rule: 'ALL',
+          WebACL: `lbc-cloudfront-waf-${environment}${suffix}`,
+          Region: 'us-east-1', // CloudFront WAF metrics are in us-east-1
+        },
+        statistic: 'Sum',
+        period: cdk.Duration.minutes(5),
+      }),
+      threshold: 100, // Alert if more than 100 blocked requests in 5 minutes
+      evaluationPeriods: 1,
+      alarmName: `lbc-waf-blocked-${environment}`,
+      alarmDescription: 'WAF blocking requests - potential attack detected',
+      treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
+    });
+
+    wafBlockedAlarm.addAlarmAction(new cloudwatch_actions.SnsAction(alarmTopic));
 
     // ============================================
     // Outputs
