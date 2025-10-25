@@ -1,0 +1,91 @@
+config:
+  target: "https://1mi1qv7d67.execute-api.us-east-1.amazonaws.com"
+  phases:
+    # Warm-up phase: gradually increase load
+    - duration: 30
+      arrivalRate: 10
+      rampTo: 50
+      name: "Warm-up"
+    
+    # Peak load phase: sustained 100 rps
+    - duration: 60
+      arrivalRate: 100
+      name: "Peak load (100 rps)"
+    
+    # Cool-down phase: gradually decrease load
+    - duration: 30
+      arrivalRate: 100
+      rampTo: 0
+      name: "Cool-down"
+  
+  http:
+    timeout: 10
+  
+  variables:
+    webhookSecret: "LTUNGUQvMktBT2jpacov3kPpPH2pDhCG"
+
+scenarios:
+  # 70% of traffic: /start command flow
+  - name: "Start command flow"
+    weight: 70
+    flow:
+      - post:
+          url: "/telegram/webhook"
+          headers:
+            Content-Type: "application/json"
+            X-Telegram-Bot-Api-Secret-Token: "{{ webhookSecret }}"
+          json:
+            update_id: "{{ $randomNumber() }}"
+            message:
+              message_id: "{{ $randomNumber() }}"
+              from:
+                id: "{{ $randomNumber() }}"
+                first_name: "LoadTest"
+                username: "loadtest{{ $randomNumber() }}"
+                language_code: "en"
+              chat:
+                id: "{{ $randomNumber() }}"
+                type: "private"
+              date: "{{ $timestamp }}"
+              text: "/start ref_loadtest_{{ $randomString() }}"
+          capture:
+            - json: "$.ok"
+              as: "responseOk"
+          expect:
+            - statusCode: 200
+            - contentType: json
+            - hasProperty: ok
+
+  # 30% of traffic: callback button flow
+  - name: "Button callback flow"
+    weight: 30
+    flow:
+      - post:
+          url: "/telegram/webhook"
+          headers:
+            Content-Type: "application/json"
+            X-Telegram-Bot-Api-Secret-Token: "{{ webhookSecret }}"
+          json:
+            update_id: "{{ $randomNumber() }}"
+            callback_query:
+              id: "{{ $randomString() }}"
+              from:
+                id: "{{ $randomNumber() }}"
+                first_name: "LoadTest"
+                username: "loadtest{{ $randomNumber() }}"
+                language_code: "en"
+              message:
+                message_id: "{{ $randomNumber() }}"
+                chat:
+                  id: "{{ $randomNumber() }}"
+                  type: "private"
+                date: "{{ $timestamp }}"
+              chat_instance: "{{ $randomString() }}"
+              data: "watch_video"
+          capture:
+            - json: "$.ok"
+              as: "responseOk"
+          expect:
+            - statusCode: 200
+            - contentType: json
+            - hasProperty: ok

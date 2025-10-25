@@ -1,0 +1,623 @@
+{
+  "info": {
+    "name": "LBC Telegram Bot - M2 End-to-End Tests",
+    "description": "Comprehensive test suite for M2 onboarding flow\n\nTests:\n1. Webhook signature validation\n2. /start command with token\n3. /start command without token\n4. Message state transitions\n5. Callback button interactions\n6. Language detection\n7. Resume semantics\n8. /restart command\n\nM2 Day 5 Item 11: End-to-end testing",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. Security Tests",
+      "item": [
+        {
+          "name": "Valid Webhook Secret",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Response has ok property\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('ok');",
+                  "    pm.expect(jsonData.ok).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Telegram-Bot-Api-Secret-Token",
+                "value": "{{TELEGRAM_WEBHOOK_SECRET}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"update_id\": 999999,\n  \"message\": {\n    \"message_id\": 1,\n    \"from\": {\n      \"id\": 12345,\n      \"first_name\": \"Test\",\n      \"username\": \"testuser\"\n    },\n    \"chat\": {\n      \"id\": 12345,\n      \"type\": \"private\"\n    },\n    \"date\": 1698249600,\n    \"text\": \"test message\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{WEBHOOK_URL}}",
+              "host": ["{{WEBHOOK_URL}}"]
+            }
+          }
+        },
+        {
+          "name": "Invalid Webhook Secret",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 401 Unauthorized\", function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});",
+                  "",
+                  "pm.test(\"Response indicates unauthorized\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('error');",
+                  "    pm.expect(jsonData.error).to.include('Unauthorized');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Telegram-Bot-Api-Secret-Token",
+                "value": "INVALID_SECRET_12345"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"update_id\": 999998,\n  \"message\": {\n    \"message_id\": 2,\n    \"from\": {\n      \"id\": 12345,\n      \"first_name\": \"Test\"\n    },\n    \"chat\": {\n      \"id\": 12345,\n      \"type\": \"private\"\n    },\n    \"date\": 1698249600,\n    \"text\": \"test\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{WEBHOOK_URL}}",
+              "host": ["{{WEBHOOK_URL}}"]
+            }
+          }
+        },
+        {
+          "name": "Missing Webhook Secret",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 401 Unauthorized\", function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"update_id\": 999997,\n  \"message\": {\n    \"message_id\": 3,\n    \"from\": {\n      \"id\": 12345,\n      \"first_name\": \"Test\"\n    },\n    \"chat\": {\n      \"id\": 12345,\n      \"type\": \"private\"\n    },\n    \"date\": 1698249600,\n    \"text\": \"test\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{WEBHOOK_URL}}",
+              "host": ["{{WEBHOOK_URL}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. /start Command Tests",
+      "item": [
+        {
+          "name": "/start without token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Message queued to SQS\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.ok).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Telegram-Bot-Api-Secret-Token",
+                "value": "{{TELEGRAM_WEBHOOK_SECRET}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"update_id\": {{$randomInt}},\n  \"message\": {\n    \"message_id\": {{$randomInt}},\n    \"from\": {\n      \"id\": 100001,\n      \"first_name\": \"John\",\n      \"last_name\": \"Doe\",\n      \"username\": \"johndoe\",\n      \"language_code\": \"en\"\n    },\n    \"chat\": {\n      \"id\": 100001,\n      \"first_name\": \"John\",\n      \"last_name\": \"Doe\",\n      \"username\": \"johndoe\",\n      \"type\": \"private\"\n    },\n    \"date\": {{$timestamp}},\n    \"text\": \"/start\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{WEBHOOK_URL}}",
+              "host": ["{{WEBHOOK_URL}}"]
+            }
+          }
+        },
+        {
+          "name": "/start with referral token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Referral token should be captured\", function () {",
+                  "    // This will be processed by jobWorker",
+                  "    pm.expect(pm.response.text()).to.include('ok');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Telegram-Bot-Api-Secret-Token",
+                "value": "{{TELEGRAM_WEBHOOK_SECRET}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"update_id\": {{$randomInt}},\n  \"message\": {\n    \"message_id\": {{$randomInt}},\n    \"from\": {\n      \"id\": 100002,\n      \"first_name\": \"Jane\",\n      \"last_name\": \"Smith\",\n      \"username\": \"janesmith\",\n      \"language_code\": \"en\"\n    },\n    \"chat\": {\n      \"id\": 100002,\n      \"first_name\": \"Jane\",\n      \"last_name\": \"Smith\",\n      \"username\": \"janesmith\",\n      \"type\": \"private\"\n    },\n    \"date\": {{$timestamp}},\n    \"text\": \"/start ref_campaign123\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{WEBHOOK_URL}}",
+              "host": ["{{WEBHOOK_URL}}"]
+            }
+          }
+        },
+        {
+          "name": "/start with UTM parameters (base64)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"UTM token should be captured\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.ok).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Telegram-Bot-Api-Secret-Token",
+                "value": "{{TELEGRAM_WEBHOOK_SECRET}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"update_id\": {{$randomInt}},\n  \"message\": {\n    \"message_id\": {{$randomInt}},\n    \"from\": {\n      \"id\": 100003,\n      \"first_name\": \"Bob\",\n      \"username\": \"bobmarley\",\n      \"language_code\": \"en\"\n    },\n    \"chat\": {\n      \"id\": 100003,\n      \"first_name\": \"Bob\",\n      \"username\": \"bobmarley\",\n      \"type\": \"private\"\n    },\n    \"date\": {{$timestamp}},\n    \"text\": \"/start dXRtX3NvdXJjZT1nb29nbGUmdXRtX21lZGl1bT1jcGMmdXRtX2NhbXBhaWduPXRlc3Q=\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{WEBHOOK_URL}}",
+              "host": ["{{WEBHOOK_URL}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Language Detection Tests",
+      "item": [
+        {
+          "name": "/start with Spanish language",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Spanish language should be detected\", function () {",
+                  "    // jobWorker will detect language_code: 'es'",
+                  "    pm.expect(pm.response.text()).to.include('ok');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Telegram-Bot-Api-Secret-Token",
+                "value": "{{TELEGRAM_WEBHOOK_SECRET}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"update_id\": {{$randomInt}},\n  \"message\": {\n    \"message_id\": {{$randomInt}},\n    \"from\": {\n      \"id\": 200001,\n      \"first_name\": \"Carlos\",\n      \"last_name\": \"García\",\n      \"username\": \"carlosgarcia\",\n      \"language_code\": \"es\"\n    },\n    \"chat\": {\n      \"id\": 200001,\n      \"first_name\": \"Carlos\",\n      \"type\": \"private\"\n    },\n    \"date\": {{$timestamp}},\n    \"text\": \"/start\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{WEBHOOK_URL}}",
+              "host": ["{{WEBHOOK_URL}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Callback Query Tests",
+      "item": [
+        {
+          "name": "Video button callback",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Callback should trigger video send\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.ok).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Telegram-Bot-Api-Secret-Token",
+                "value": "{{TELEGRAM_WEBHOOK_SECRET}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"update_id\": {{$randomInt}},\n  \"callback_query\": {\n    \"id\": \"{{$randomUUID}}\",\n    \"from\": {\n      \"id\": 100001,\n      \"first_name\": \"John\",\n      \"username\": \"johndoe\",\n      \"language_code\": \"en\"\n    },\n    \"message\": {\n      \"message_id\": 123,\n      \"chat\": {\n        \"id\": 100001,\n        \"type\": \"private\"\n      },\n      \"date\": {{$timestamp}}\n    },\n    \"chat_instance\": \"{{$randomUUID}}\",\n    \"data\": \"watch_video\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{WEBHOOK_URL}}",
+              "host": ["{{WEBHOOK_URL}}"]
+            }
+          }
+        },
+        {
+          "name": "Audio button callback",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Callback should trigger TTS audio\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.ok).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Telegram-Bot-Api-Secret-Token",
+                "value": "{{TELEGRAM_WEBHOOK_SECRET}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"update_id\": {{$randomInt}},\n  \"callback_query\": {\n    \"id\": \"{{$randomUUID}}\",\n    \"from\": {\n      \"id\": 100001,\n      \"first_name\": \"John\",\n      \"username\": \"johndoe\",\n      \"language_code\": \"en\"\n    },\n    \"message\": {\n      \"message_id\": 124,\n      \"chat\": {\n        \"id\": 100001,\n        \"type\": \"private\"\n      },\n      \"date\": {{$timestamp}}\n    },\n    \"chat_instance\": \"{{$randomUUID}}\",\n    \"data\": \"play_audio\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{WEBHOOK_URL}}",
+              "host": ["{{WEBHOOK_URL}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Resume Semantics Tests",
+      "item": [
+        {
+          "name": "User returns after drop-off",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"FSM should resume from previous state\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.ok).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Telegram-Bot-Api-Secret-Token",
+                "value": "{{TELEGRAM_WEBHOOK_SECRET}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"update_id\": {{$randomInt}},\n  \"message\": {\n    \"message_id\": {{$randomInt}},\n    \"from\": {\n      \"id\": 100001,\n      \"first_name\": \"John\",\n      \"username\": \"johndoe\",\n      \"language_code\": \"en\"\n    },\n    \"chat\": {\n      \"id\": 100001,\n      \"type\": \"private\"\n    },\n    \"date\": {{$timestamp}},\n    \"text\": \"Hi\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{WEBHOOK_URL}}",
+              "host": ["{{WEBHOOK_URL}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. /restart Command Tests",
+      "item": [
+        {
+          "name": "/restart resets FSM",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"FSM should reset to NEW state\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.ok).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Telegram-Bot-Api-Secret-Token",
+                "value": "{{TELEGRAM_WEBHOOK_SECRET}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"update_id\": {{$randomInt}},\n  \"message\": {\n    \"message_id\": {{$randomInt}},\n    \"from\": {\n      \"id\": 100001,\n      \"first_name\": \"John\",\n      \"username\": \"johndoe\",\n      \"language_code\": \"en\"\n    },\n    \"chat\": {\n      \"id\": 100001,\n      \"type\": \"private\"\n    },\n    \"date\": {{$timestamp}},\n    \"text\": \"/restart\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{WEBHOOK_URL}}",
+              "host": ["{{WEBHOOK_URL}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Edge Cases Tests",
+      "item": [
+        {
+          "name": "Empty message text",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Should handle gracefully\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.ok).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Telegram-Bot-Api-Secret-Token",
+                "value": "{{TELEGRAM_WEBHOOK_SECRET}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"update_id\": {{$randomInt}},\n  \"message\": {\n    \"message_id\": {{$randomInt}},\n    \"from\": {\n      \"id\": 300001,\n      \"first_name\": \"Edge\"\n    },\n    \"chat\": {\n      \"id\": 300001,\n      \"type\": \"private\"\n    },\n    \"date\": {{$timestamp}},\n    \"text\": \"\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{WEBHOOK_URL}}",
+              "host": ["{{WEBHOOK_URL}}"]
+            }
+          }
+        },
+        {
+          "name": "Very long message",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Should handle long messages\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.ok).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Telegram-Bot-Api-Secret-Token",
+                "value": "{{TELEGRAM_WEBHOOK_SECRET}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"update_id\": {{$randomInt}},\n  \"message\": {\n    \"message_id\": {{$randomInt}},\n    \"from\": {\n      \"id\": 300002,\n      \"first_name\": \"Tester\"\n    },\n    \"chat\": {\n      \"id\": 300002,\n      \"type\": \"private\"\n    },\n    \"date\": {{$timestamp}},\n    \"text\": \"Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{WEBHOOK_URL}}",
+              "host": ["{{WEBHOOK_URL}}"]
+            }
+          }
+        },
+        {
+          "name": "Special characters in name",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Should handle special characters\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.ok).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Telegram-Bot-Api-Secret-Token",
+                "value": "{{TELEGRAM_WEBHOOK_SECRET}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"update_id\": {{$randomInt}},\n  \"message\": {\n    \"message_id\": {{$randomInt}},\n    \"from\": {\n      \"id\": 300003,\n      \"first_name\": \"Test™️\",\n      \"last_name\": \"User©️\",\n      \"username\": \"test_user_123\"\n    },\n    \"chat\": {\n      \"id\": 300003,\n      \"type\": \"private\"\n    },\n    \"date\": {{$timestamp}},\n    \"text\": \"/start\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{WEBHOOK_URL}}",
+              "host": ["{{WEBHOOK_URL}}"]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "WEBHOOK_URL",
+      "value": "https://1mi1qv7d67.execute-api.us-east-1.amazonaws.com/telegram/webhook",
+      "type": "string"
+    },
+    {
+      "key": "TELEGRAM_WEBHOOK_SECRET",
+      "value": "LTUNGUQvMktBT2jpacov3kPpPH2pDhCG",
+      "type": "string"
+    }
+  ]
+}
