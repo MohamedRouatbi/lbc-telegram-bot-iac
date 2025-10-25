@@ -376,9 +376,12 @@ wQIDAQAB
         SQS_QUEUE_URL: telegramEventsQueue.queueUrl,
         TELEGRAM_WEBHOOK_SECRET_ARN: webhookSecret.secretArn,
         ENVIRONMENT: environment,
+        AWS_NODEJS_CONNECTION_REUSE_ENABLED: '1', // Performance optimization
       },
       timeout: cdk.Duration.seconds(30),
       memorySize: 256,
+      tracing: lambda.Tracing.ACTIVE, // Enable X-Ray tracing
+      insightsVersion: lambda.LambdaInsightsVersion.VERSION_1_0_229_0, // CloudWatch Lambda Insights
     });
 
     // Grant permissions
@@ -401,9 +404,12 @@ wQIDAQAB
         TTS_BUCKET: ttsBucket.bucketName,
         TELEGRAM_BOT_TOKEN_SECRET_ARN: telegramBotTokenSecret.secretArn,
         KMS_KEY_ARN: s3KmsKey.keyArn,
+        AWS_NODEJS_CONNECTION_REUSE_ENABLED: '1', // Performance optimization
       },
       timeout: cdk.Duration.seconds(60),
       memorySize: 512,
+      tracing: lambda.Tracing.ACTIVE, // Enable X-Ray tracing
+      insightsVersion: lambda.LambdaInsightsVersion.VERSION_1_0_229_0, // CloudWatch Lambda Insights
     });
 
     // Grant DynamoDB permissions
@@ -627,6 +633,222 @@ wQIDAQAB
     });
 
     wafBlockedAlarm.addAlarmAction(new cloudwatch_actions.SnsAction(alarmTopic));
+
+    // M2 Day 4: API Gateway 5XX Errors
+    const apiGateway5xxAlarm = new cloudwatch.Alarm(this, 'ApiGateway5xxAlarm', {
+      metric: new cloudwatch.Metric({
+        namespace: 'AWS/ApiGateway',
+        metricName: '5XXError',
+        dimensionsMap: {
+          ApiId: httpApi.httpApiId,
+        },
+        statistic: 'Sum',
+        period: cdk.Duration.minutes(5),
+      }),
+      threshold: 5, // Alert if more than 5 server errors in 5 minutes
+      evaluationPeriods: 1,
+      alarmName: `lbc-api-5xx-${environment}`,
+      alarmDescription: 'API Gateway 5XX server errors detected',
+      treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
+    });
+
+    apiGateway5xxAlarm.addAlarmAction(new cloudwatch_actions.SnsAction(alarmTopic));
+
+    // M2 Day 4: Lambda Error Rate > 2%
+    const webhookErrorRateAlarm = new cloudwatch.Alarm(this, 'WebhookErrorRateAlarm', {
+      metric: new cloudwatch.MathExpression({
+        expression: '(errors / invocations) * 100',
+        usingMetrics: {
+          errors: telegramWebhookLambda.metricErrors({
+            statistic: 'Sum',
+            period: cdk.Duration.minutes(5),
+          }),
+          invocations: telegramWebhookLambda.metricInvocations({
+            statistic: 'Sum',
+            period: cdk.Duration.minutes(5),
+          }),
+        },
+        period: cdk.Duration.minutes(5),
+      }),
+      threshold: 2, // Alert if error rate > 2%
+      evaluationPeriods: 2,
+      alarmName: `lbc-webhook-error-rate-${environment}`,
+      alarmDescription: 'Webhook Lambda error rate exceeds 2%',
+      treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
+    });
+
+    webhookErrorRateAlarm.addAlarmAction(new cloudwatch_actions.SnsAction(alarmTopic));
+
+    const jobWorkerErrorRateAlarm = new cloudwatch.Alarm(this, 'JobWorkerErrorRateAlarm', {
+      metric: new cloudwatch.MathExpression({
+        expression: '(errors / invocations) * 100',
+        usingMetrics: {
+          errors: jobWorkerLambda.metricErrors({
+            statistic: 'Sum',
+            period: cdk.Duration.minutes(5),
+          }),
+          invocations: jobWorkerLambda.metricInvocations({
+            statistic: 'Sum',
+            period: cdk.Duration.minutes(5),
+          }),
+        },
+        period: cdk.Duration.minutes(5),
+      }),
+      threshold: 2, // Alert if error rate > 2%
+      evaluationPeriods: 2,
+      alarmName: `lbc-job-worker-error-rate-${environment}`,
+      alarmDescription: 'JobWorker Lambda error rate exceeds 2%',
+      treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
+    });
+
+    jobWorkerErrorRateAlarm.addAlarmAction(new cloudwatch_actions.SnsAction(alarmTopic));
+
+    // M2 Day 4: P95 Duration Alarm (already exists, keeping for reference)
+    // jobWorkerLatencyAlarm already defined above with p95 threshold
+
+    // ============================================
+    // M2 Day 4: CloudWatch Dashboard
+    // ============================================
+
+    const dashboard = new cloudwatch.Dashboard(this, 'LbcDashboard', {
+      dashboardName: `lbc-telegram-bot-${environment}${suffix}`,
+    });
+
+    // Row 1: API Gateway Metrics
+    dashboard.addWidgets(
+      new cloudwatch.GraphWidget({
+        title: 'API Gateway - Requests',
+        left: [
+          new cloudwatch.Metric({
+            namespace: 'AWS/ApiGateway',
+            metricName: 'Count',
+            dimensionsMap: { ApiId: httpApi.httpApiId },
+            statistic: 'Sum',
+            period: cdk.Duration.minutes(5),
+            label: 'Total Requests',
+          }),
+        ],
+        width: 12,
+      }),
+      new cloudwatch.GraphWidget({
+        title: 'API Gateway - Errors',
+        left: [
+          new cloudwatch.Metric({
+            namespace: 'AWS/ApiGateway',
+            metricName: '4XXError',
+            dimensionsMap: { ApiId: httpApi.httpApiId },
+            statistic: 'Sum',
+            period: cdk.Duration.minutes(5),
+            label: '4XX Errors',
+            color: cloudwatch.Color.ORANGE,
+          }),
+          new cloudwatch.Metric({
+            namespace: 'AWS/ApiGateway',
+            metricName: '5XXError',
+            dimensionsMap: { ApiId: httpApi.httpApiId },
+            statistic: 'Sum',
+            period: cdk.Duration.minutes(5),
+            label: '5XX Errors',
+            color: cloudwatch.Color.RED,
+          }),
+        ],
+        width: 12,
+      })
+    );
+
+    // Row 2: Lambda Metrics - Webhook
+    dashboard.addWidgets(
+      new cloudwatch.GraphWidget({
+        title: 'Webhook Lambda - Invocations & Errors',
+        left: [telegramWebhookLambda.metricInvocations({ label: 'Invocations', statistic: 'Sum' })],
+        right: [telegramWebhookLambda.metricErrors({ label: 'Errors', statistic: 'Sum', color: cloudwatch.Color.RED })],
+        width: 12,
+      }),
+      new cloudwatch.GraphWidget({
+        title: 'Webhook Lambda - Duration (p50, p95, p99)',
+        left: [
+          telegramWebhookLambda.metricDuration({ statistic: 'p50', label: 'p50', color: cloudwatch.Color.GREEN }),
+          telegramWebhookLambda.metricDuration({ statistic: 'p95', label: 'p95', color: cloudwatch.Color.ORANGE }),
+          telegramWebhookLambda.metricDuration({ statistic: 'p99', label: 'p99', color: cloudwatch.Color.RED }),
+        ],
+        width: 12,
+      })
+    );
+
+    // Row 3: Lambda Metrics - JobWorker
+    dashboard.addWidgets(
+      new cloudwatch.GraphWidget({
+        title: 'JobWorker Lambda - Invocations & Errors',
+        left: [jobWorkerLambda.metricInvocations({ label: 'Invocations', statistic: 'Sum' })],
+        right: [jobWorkerLambda.metricErrors({ label: 'Errors', statistic: 'Sum', color: cloudwatch.Color.RED })],
+        width: 12,
+      }),
+      new cloudwatch.GraphWidget({
+        title: 'JobWorker Lambda - Duration (p50, p95, p99)',
+        left: [
+          jobWorkerLambda.metricDuration({ statistic: 'p50', label: 'p50', color: cloudwatch.Color.GREEN }),
+          jobWorkerLambda.metricDuration({ statistic: 'p95', label: 'p95', color: cloudwatch.Color.ORANGE }),
+          jobWorkerLambda.metricDuration({ statistic: 'p99', label: 'p99', color: cloudwatch.Color.RED }),
+        ],
+        width: 12,
+      })
+    );
+
+    // Row 4: DynamoDB & SQS Metrics
+    dashboard.addWidgets(
+      new cloudwatch.GraphWidget({
+        title: 'DynamoDB - Read/Write Capacity',
+        left: [
+          usersTable.metricConsumedReadCapacityUnits({ label: 'Users Read', statistic: 'Sum' }),
+          usersTable.metricConsumedWriteCapacityUnits({ label: 'Users Write', statistic: 'Sum' }),
+        ],
+        width: 12,
+      }),
+      new cloudwatch.GraphWidget({
+        title: 'SQS - Messages',
+        left: [
+          telegramEventsQueue.metricNumberOfMessagesSent({ label: 'Messages Sent', statistic: 'Sum' }),
+          telegramEventsQueue.metricNumberOfMessagesReceived({ label: 'Messages Received', statistic: 'Sum' }),
+          dlq.metricApproximateNumberOfMessagesVisible({ label: 'DLQ Messages', statistic: 'Sum', color: cloudwatch.Color.RED }),
+        ],
+        width: 12,
+      })
+    );
+
+    // Row 5: WAF & Security Metrics
+    dashboard.addWidgets(
+      new cloudwatch.GraphWidget({
+        title: 'WAF - Blocked Requests',
+        left: [
+          new cloudwatch.Metric({
+            namespace: 'AWS/WAFV2',
+            metricName: 'BlockedRequests',
+            dimensionsMap: {
+              Rule: 'ALL',
+              WebACL: `lbc-cloudfront-waf-${environment}${suffix}`,
+              Region: 'us-east-1',
+            },
+            statistic: 'Sum',
+            period: cdk.Duration.minutes(5),
+            label: 'Blocked Requests',
+            color: cloudwatch.Color.RED,
+          }),
+        ],
+        width: 12,
+      }),
+      new cloudwatch.SingleValueWidget({
+        title: 'System Health',
+        metrics: [
+          telegramWebhookLambda.metricErrors({ statistic: 'Sum', label: 'Webhook Errors' }),
+          jobWorkerLambda.metricErrors({ statistic: 'Sum', label: 'JobWorker Errors' }),
+          dlq.metricApproximateNumberOfMessagesVisible({ statistic: 'Sum', label: 'DLQ Messages' }),
+        ],
+        width: 12,
+      })
+    );
 
     // ============================================
     // Outputs
